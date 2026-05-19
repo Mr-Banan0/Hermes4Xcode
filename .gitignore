@@ -1,0 +1,27 @@
+# Xcode
+*.xcuserdata
+*.xcuserstate
+*.xctestplan
+DerivedData/
+build/
+*.build/
+
+# macOS
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Swift Package Manager
+.packages/
+.build/
+Package.resolved
+
+# Environment & Secrets
+.env
+*.env
+
+# IDEs
+.idea/
+.vscode/
+*.swp
