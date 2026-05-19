@@ -52,7 +52,7 @@ struct ProviderSettingsView: View {
             // Header
             HStack {
                 Text("Provider Settings")
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
                     .foregroundColor(.hermes)
                 Spacer()
             }
@@ -66,7 +66,7 @@ struct ProviderSettingsView: View {
                     // Provider selector
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Provider")
-                            .font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary)
+                            .font(.system(size: 10, design: .monospaced)).foregroundColor(.secondary)
                         Picker("", selection: $selectedProvider) {
                             ForEach(AvailableProviders, id: \.name) { p in
                                 Text(p.name).tag(p.name)
@@ -85,30 +85,30 @@ struct ProviderSettingsView: View {
                     // Model
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Model")
-                            .font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary)
+                            .font(.system(size: 10, design: .monospaced)).foregroundColor(.secondary)
                         TextField("model name", text: $config.model)
                             .textFieldStyle(.plain)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(size: 13, design: .monospaced))
                             .padding(8).background(Color(white: 0.15)).cornerRadius(6)
                     }
 
                     // Base URL
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Base URL")
-                            .font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary)
+                            .font(.system(size: 10, design: .monospaced)).foregroundColor(.secondary)
                         TextField("https://...", text: $config.baseURL)
                             .textFieldStyle(.plain)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(size: 13, design: .monospaced))
                             .padding(8).background(Color(white: 0.15)).cornerRadius(6)
                     }
 
                     // API Key
                     VStack(alignment: .leading, spacing: 4) {
                         Text("API Key")
-                            .font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary)
+                            .font(.system(size: 10, design: .monospaced)).foregroundColor(.secondary)
                         SecureField("sk-...", text: $config.apiKey)
                             .textFieldStyle(.plain)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(size: 13, design: .monospaced))
                             .padding(8).background(Color(white: 0.15)).cornerRadius(6)
                     }
 
@@ -120,7 +120,7 @@ struct ProviderSettingsView: View {
                                     ProgressView().scaleEffect(0.5).frame(width: 10, height: 10)
                                 }
                                 Text(isTesting ? "Testing..." : "Test Connection")
-                                    .font(.system(size: 9, design: .monospaced))
+                                    .font(.system(size: 10, design: .monospaced))
                             }
                             .padding(.horizontal, 12).padding(.vertical, 6)
                             .background(Color.hermes.opacity(0.15)).cornerRadius(4)
@@ -130,7 +130,7 @@ struct ProviderSettingsView: View {
 
                         Button(action: saveConfig) {
                             Text("Save")
-                                .font(.system(size: 9, design: .monospaced))
+                                .font(.system(size: 10, design: .monospaced))
                                 .padding(.horizontal, 16).padding(.vertical, 6)
                                 .background(Color.hermes).cornerRadius(4)
                         }
@@ -144,7 +144,7 @@ struct ProviderSettingsView: View {
                                 .foregroundColor(result.hasPrefix("OK") ? .green : .red)
                                 .font(.caption)
                             Text(result)
-                                .font(.system(size: 9, design: .monospaced))
+                                .font(.system(size: 10, design: .monospaced))
                                 .foregroundColor(result.hasPrefix("OK") ? .green : .red)
                         }
                         .padding(8)

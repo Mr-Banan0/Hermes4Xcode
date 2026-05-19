@@ -1,64 +1,31 @@
 import SwiftUI
 import AppKit
 
-struct Message: Identifiable {
-    let id = UUID()
-    let role: String
-    let text: String
-}
-
-// MARK: - Main Chat View
-
 struct HermesChatView: View {
-    @State private var messages: [StructuredMessage] = []
-    @State private var inputText = ""
-    @State private var isStreaming = false
-    @State private var currentAssistantText = ""
+    @ObservedObject var manager: AgentManager
     @FocusState private var isInputFocused: Bool
     @State private var selectionCtx: XcodeSelectionContext?
-
     @State private var buildLog: [String] = []
     @State private var isBuilding = false
     @State private var showBuildLog = false
     @State private var currentFileName: String?
     @State private var showTestOptions = false
-    @State private var pendingTestAction: (() -> Void)?
 
     let initialCode: String?
-    private let client = HermesAPIClient()
 
-    private let welcomeMessage = StructuredMessage(
-        role: "assistant",
-        segments: [.text(
-            "██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗\n" +
-            "██║  ██║██╔════╝██╔══██╗████╗ ████║██╔════╝██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝\n" +
-            "███████║█████╗  ██████╔╝██╔████╔██║█████╗  ███████╗█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║\n" +
-            "██╔══██║██╔══╝  ██╔══██╗██║╚██╔╝██║██╔══╝  ╚════██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║\n" +
-            "██║  ██║███████╗██║  ██║██║ ╚═╝ ██║███████╗███████║      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║\n" +
-            "╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝\n\n" +
-            "Select code in Xcode, then chat with me below.\n\n" +
-            "  \u{2022} \u{1F3D7} Build \u{2014} compile\n  \u{2022} \u{1F9EA} Test \u{2014} run/create tests\n  \u{2022} \u{26A1} Quick \u{2014} fix, review, refactor\n  \u{2022} \u{1F504} Refresh \u{2014} detect Xcode selection"
-        )],
-        rawText: "Welcome"
-    )
+    var activeTab: AgentTab { manager.activeTab }
+    var messages: [StoredMessage] { activeTab.messages }
+    var inputText: Binding<String> {
+        Binding(
+            get: { self.activeTab.inputText },
+            set: { self.manager.updateInput($0, for: self.activeTab.id) }
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Title Bar
-            HStack {
-                Text("Hermes4Xcode")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.hermes)
-                Spacer()
-                HStack(spacing: 4) {
-                    GatewayStatusDot()
-                    if isStreaming {
-                        ProgressView().scaleEffect(0.6).frame(width: 12, height: 12)
-                    }
-                }
-            }
-            .padding(.horizontal, 14).padding(.top, 6).padding(.bottom, 4)
-
+            // Tab Bar
+            TabBarView(manager: manager)
             Divider().background(Color.hermes.opacity(0.3))
 
             // Toolbar
@@ -77,20 +44,26 @@ struct HermesChatView: View {
                 ScrollView {
                     LazyVStack(spacing: 10) {
                         ForEach(messages) { msg in
-                            TerminalMessageView(msg: msg)
+                            TerminalMessageView(msg: msg.asStructured)
                         }
-                        if isStreaming {
-                            TerminalMessageView(msg: StructuredMessage(
+                        if manager.streamingTabs.contains(activeTab.id) {
+                            let streamText = manager.streamingTexts[activeTab.id] ?? ""
+                            let streamMsg = StructuredMessage(
                                 role: "assistant",
-                                segments: MessageParser.parse(currentAssistantText + "\u{258C}"),
-                                rawText: currentAssistantText + "\u{258C}"
-                            )).id("cursor")
+                                segments: MessageParser.parse(streamText + "\u{258C}"),
+                                rawText: streamText + "\u{258C}"
+                            )
+                            TerminalMessageView(msg: streamMsg).id("cursor")
                         }
                     }
                     .padding(.horizontal, 8).padding(.vertical, 8).id("bottom")
                 }
                 .onChange(of: messages.count) { _, _ in withAnimation { proxy.scrollTo("bottom") } }
-                .onChange(of: currentAssistantText) { _, _ in proxy.scrollTo("cursor", anchor: .bottom) }
+                .onChange(of: manager.currentAssistantText) { _, _ in
+                    if manager.streamingTabs.contains(activeTab.id) {
+                        proxy.scrollTo("cursor", anchor: .bottom)
+                    }
+                }
             }
 
             // Build Log
@@ -107,22 +80,21 @@ struct HermesChatView: View {
                 HStack(spacing: 4) {
                     if let ctx = selectionCtx {
                         SelectionPill(context: ctx) { selectionCtx = nil }
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                     Spacer()
-                    Button { checkContextOnActivate() } label: {
+                    Button { checkContext() } label: {
                         Image(systemName: "arrow.clockwise").font(.caption2)
                     }.buttonStyle(.plain).foregroundColor(.hermes.opacity(0.6))
-                        .help("Refresh Xcode selection").disabled(isStreaming)
+                        .help("Refresh Xcode selection").disabled(manager.isStreaming)
                 }
 
                 HStack(spacing: 6) {
-                    TextField("Ask Hermes...", text: $inputText)
+                    TextField("Ask Hermes...", text: inputText)
                         .textFieldStyle(.plain)
                         .focused($isInputFocused)
                         .onSubmit(send)
-                        .disabled(isStreaming)
-                        .font(.system(size: 12, design: .monospaced))
+                        .disabled(manager.isStreaming)
+                        .font(.system(size: 13, design: .monospaced))
                         .foregroundColor(.white)
                         .padding(.horizontal, 10).padding(.vertical, 8)
                         .background(Color(white: 0.12))
@@ -131,37 +103,42 @@ struct HermesChatView: View {
 
                     Button(action: send) {
                         Image(systemName: "arrow.up.circle.fill").font(.title3)
-                            .foregroundColor(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isStreaming ? .gray : .hermes)
+                            .foregroundColor(inputText.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty || manager.isStreaming ? .gray : .hermes)
                     }.buttonStyle(.plain)
-                        .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isStreaming)
+                        .disabled(inputText.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty || manager.isStreaming)
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
         }
         .background(Color.black)
         .frame(minWidth: 420, minHeight: 540)
-        .onAppear {
-            if messages.isEmpty { messages.append(welcomeMessage) }
-            checkContextOnActivate()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in checkContextOnActivate() }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in checkContextOnActivate() }
-        .onChange(of: isInputFocused) { _, _ in checkContextOnActivate() }
+        .onAppear { checkContext() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in checkContext() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in checkContext() }
+        .onChange(of: isInputFocused) { _, _ in checkContext() }
         .onAppear { XcodeContextProvider.shared.buildDelegate = self }
         .confirmationDialog("No test targets found", isPresented: $showTestOptions, titleVisibility: .visible) {
-            Button("Build only (skip tests)") { startBuild() }
-            Button("Create Unit Test Target + Run") { createAndRunTests() }
+            Button("Build only") { startBuild() }
+            Button("Create test target") { createAndRunTests() }
             Button("How to add tests") {
-                messages.append(StructuredMessage(role: "assistant", segments: [.text(
-"To add a test target in Xcode:\n\n1. File -> New -> Target\n2. Select \"Unit Testing Bundle\"\n3. Language: Swift\n4. Target: Hermes4Xcode\n5. Click Finish"
-                )], rawText: "Test setup"))
+                manager.appendMessage(StoredMessage(role: "assistant", text: "To add a test target: File > New > Target > Unit Testing Bundle"), to: activeTab.id)
             }
             Button("Cancel", role: .cancel) {}
         }
+        .confirmationDialog("Create new agent?", isPresented: Binding(
+            get: { manager.pendingAgentName != nil },
+            set: { if !$0 { manager.cancelCreateAgent() } }
+        ), titleVisibility: .visible) {
+            if let name = manager.pendingAgentName {
+                Text("Create agent \"\(name)\"?")
+                Button("Create") { manager.confirmCreateAgent() }
+                Button("Cancel", role: .cancel) { manager.cancelCreateAgent() }
+            }
+        }
     }
 
-    private func checkContextOnActivate() {
-        guard !isStreaming else { return }
+    private func checkContext() {
+        guard !manager.isStreaming else { return }
         DispatchQueue.global().async {
             let ctx = XcodeContextProvider.shared.fetchSelection()
             let name = XcodeContextProvider.shared.readCurrentFileName()
@@ -172,15 +149,16 @@ struct HermesChatView: View {
         }
     }
 
-    private func getCurrentFilePath() -> String? {
-        return XcodeContextProvider.shared.readCurrentFilePath()
+    private func send() {
+        guard !activeTab.inputText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        manager.sendMessage(from: activeTab.id)
     }
 
     private func readCurrentFile() {
         DispatchQueue.global().async {
             guard let content = XcodeContextProvider.shared.readCurrentFile(),
                   let name = XcodeContextProvider.shared.readCurrentFileName() else { return }
-            DispatchQueue.main.async { inputText = "I'm looking at `\(name)`:\n\n```swift\n\(content)\n```" }
+            DispatchQueue.main.async { manager.updateInput("I'm looking at `\(name)`:\n\n```swift\n\(content)\n```", for: activeTab.id) }
         }
     }
 
@@ -214,8 +192,7 @@ struct HermesChatView: View {
         TESTEOF
         """
         XcodeContextProvider.shared.runShellAsync("cd \"\(projDir)\" && \(cmds)")
-        buildLog.append("Created test file: Hermes4XcodeTests/Hermes4XcodeTests.swift\n")
-        buildLog.append("Add test target in Xcode: File > New > Target > Unit Testing Bundle\n")
+        buildLog.append("Created test file\nAdd test target in Xcode\n")
         isBuilding = false
     }
 
@@ -226,11 +203,11 @@ struct HermesChatView: View {
 
     private func showProjectInfo() {
         guard let info = XcodeContextProvider.shared.getProjectInfo() else {
-            messages.append(StructuredMessage(role: "assistant", segments: [.text("Could not read project info.")], rawText: "Error"))
+            manager.appendMessage(StoredMessage(role: "assistant", text: "Could not read project info."), to: activeTab.id)
             return
         }
         let text = info.summary + (!info.targets.isEmpty ? "\nTargets: " + info.targets.joined(separator: ", ") : "")
-        messages.append(StructuredMessage(role: "assistant", segments: [.text(text)], rawText: text))
+        manager.appendMessage(StoredMessage(role: "assistant", text: text), to: activeTab.id)
     }
 
     private func handleQuickAction(_ action: String) {
@@ -238,73 +215,44 @@ struct HermesChatView: View {
         switch action {
         case "fix_build": prompt = "Read the last build errors and fix them. Build again to verify."
         case "generate_tests": prompt = "Look at the current file and generate comprehensive unit tests using XCTest."
-        case "review": prompt = "Review the current file. Check for: code style, bugs, performance, Swift best practices."
+        case "review": prompt = "Review the current file. Check for: code style, bugs, performance."
         case "refactor": prompt = "Refactor the selected code. Explain what you changed."
         case "commit": prompt = "Look at the current git diff and generate a concise git commit message."
         case "structure":
             if let s = XcodeContextProvider.shared.readProjectStructure() {
-                messages.append(StructuredMessage(role: "assistant", segments: [.text(s)], rawText: s))
-            } else { messages.append(StructuredMessage(role: "assistant", segments: [.text("Could not read project structure.")], rawText: "Error")) }
+                manager.appendMessage(StoredMessage(role: "assistant", text: s), to: activeTab.id)
+            } else { manager.appendMessage(StoredMessage(role: "assistant", text: "Could not read project structure."), to: activeTab.id) }
             return
-        case "save_note": inputText = "Remember this about the project: "; return
+        case "save_note": manager.updateInput("Remember this about the project: ", for: activeTab.id); return
         case "analyze":
             guard let fp = getCurrentFilePath() else {
-                messages.append(StructuredMessage(role: "assistant", segments: [.text("No file open in Xcode.")], rawText: "Error")); return
+                manager.appendMessage(StoredMessage(role: "assistant", text: "No file open."), to: activeTab.id); return
             }
             let fn = (fp as NSString).lastPathComponent
-            messages.append(StructuredMessage(role: "assistant", segments: [.text("Analyzing \(fn) with SourceKit-LSP...")], rawText: "Analyzing..."))
+            manager.appendMessage(StoredMessage(role: "assistant", text: "Analyzing \(fn) with SourceKit-LSP..."), to: activeTab.id)
             Task {
                 let r = await SourceKitLSPClient.shared.getDiagnostics(file: fp) ?? "Analysis complete"
-                await MainActor.run { messages.append(StructuredMessage(role: "assistant", segments: [.text(r)], rawText: r)) }
+                await MainActor.run { manager.appendMessage(StoredMessage(role: "assistant", text: r), to: activeTab.id) }
             }
             return
         default: return
         }
-        inputText = prompt
+        manager.updateInput(prompt, for: activeTab.id)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { send() }
     }
 
-    private func send() {
-        let text = inputText; inputText = ""
-        messages.append(StructuredMessage(role: "user", segments: [.text(text)], rawText: text))
-        let attachedCtx = selectionCtx
-        isStreaming = true; currentAssistantText = ""
-        Task {
-            var history = messages.map { ["role": $0.role, "content": $0.rawText] }
-            if let ctx = attachedCtx {
-                history.removeLast()
-                history.append(["role": "system", "content": ctx.systemPrompt])
-                history.append(["role": "user", "content": text])
-            }
-            await client.sendMessage(text, contextCode: attachedCtx?.selectedText, history: history,
-                onDelta: { d in Task { @MainActor in currentAssistantText += d } },
-                onComplete: { r in
-                    Task { @MainActor in
-                        isStreaming = false
-                        switch r {
-                        case .success(let full):
-                            messages.append(StructuredMessage(role: "assistant", segments: MessageParser.parse(full), rawText: full))
-                            autoApplyIfNeeded(response: full)
-                        case .failure(let err):
-                            messages.append(StructuredMessage(role: "assistant", segments: [.text("Error: \(err.localizedDescription)")], rawText: "Error"))
-                        }
-                        currentAssistantText = ""
-                    }
-                })
-        }
+    private func getCurrentFilePath() -> String? {
+        XcodeContextProvider.shared.readCurrentFilePath()
     }
+}
 
-    private func autoApplyIfNeeded(response: String) {
-        guard let ctx = selectionCtx else { return }
-        guard let start = response.range(of: "```swift\n"),
-              let end = response.range(of: "\n```", range: start.upperBound..<response.endIndex) else { return }
-        let code = String(response[start.upperBound..<end.lowerBound])
-        guard !code.isEmpty else { return }
-        DispatchQueue.global().async {
-            if XcodeContextProvider.shared.replaceSelection(with: code) {
-                DispatchQueue.main.async { withAnimation { selectionCtx = nil } }
-            }
-        }
+// MARK: - Build Delegate
+
+extension HermesChatView: XcodeBuildDelegate {
+    func buildOutputReceived(_ line: String) { buildLog.append(line); if !showBuildLog { showBuildLog = true } }
+    func buildFinished(exitCode: Int32) {
+        isBuilding = false
+        buildLog.append("\n\(exitCode == 0 ? "Build Succeeded" : "Build Failed (exit \(exitCode))")\n")
     }
 }
 
@@ -323,7 +271,7 @@ struct TerminalMessageView: View {
                             .font(.system(size: 9, weight: .semibold, design: .monospaced))
                             .foregroundColor(.hermesAmber)
                         Text(msg.rawText)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(size: 13, design: .monospaced))
                             .foregroundColor(Color(white: 0.9))
                             .textSelection(.enabled)
                             .padding(10)
@@ -335,7 +283,6 @@ struct TerminalMessageView: View {
                 }
             } else {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Top border — stretches with window
                     HStack(spacing: 0) {
                         Text("\u{256D}\u{2500} \u{2695} Hermes ")
                             .font(.system(size: 9, weight: .regular, design: .monospaced))
@@ -345,16 +292,12 @@ struct TerminalMessageView: View {
                             .fill(Color.hermes.opacity(0.8))
                             .frame(height: 1)
                     }
-
-                    // Content
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(msg.segments) { segment in
                             SegmentView(segment: segment)
                         }
                     }
                     .padding(.leading, 14).padding(.vertical, 4)
-
-                    // Bottom border
                     HStack(spacing: 0) {
                         Text("\u{2570}\u{2500}")
                             .font(.system(size: 9, weight: .regular, design: .monospaced))
@@ -379,11 +322,10 @@ struct SegmentView: View {
         switch segment {
         case .text(let t):
             Text(t)
-                .font(.system(size: 11, design: .monospaced))
+                .font(.system(size: 13, design: .monospaced))
                 .foregroundColor(Color(white: 0.85))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-
         case .toolCall(let icon, let name, let status, let detail):
             HStack(spacing: 6) {
                 Image(systemName: icon).font(.caption).foregroundColor(statusColor(status))
@@ -393,7 +335,6 @@ struct SegmentView: View {
             }
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(Color(white: 0.12)).cornerRadius(4)
-
         case .diff(let file, let code):
             VStack(alignment: .leading, spacing: 4) {
                 if !file.isEmpty {
@@ -414,7 +355,7 @@ struct SegmentView: View {
         }
     }
 
-    private func statusColor(_ s: ToolCallStatus) -> Color {
+    func statusColor(_ s: ToolCallStatus) -> Color {
         switch s { case .pending: return .gray; case .running: return .blue; case .success: return .green; case .failed: return .red }
     }
 }
@@ -429,7 +370,7 @@ struct XcodeToolbarView: View {
     var body: some View {
         HStack(spacing: 4) {
             if let file = currentFile {
-                Text(file).font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary).lineLimit(1)
+                Text(file).font(.system(size: 10, design: .monospaced)).foregroundColor(.secondary).lineLimit(1)
             }
             Spacer()
             TBtn(icon: "doc.text.magnifyingglass", label: "Read", action: onReadFile, disabled: isBuilding)
@@ -450,7 +391,7 @@ struct XcodeToolbarView: View {
             } label: {
                 HStack(spacing: 2) {
                     Image(systemName: "bolt.fill").font(.caption)
-                    Text("Quick").font(.system(size: 9, design: .monospaced))
+                    Text("Quick").font(.system(size: 10, design: .monospaced))
                 }
                 .padding(.horizontal, 6).padding(.vertical, 3)
                 .background(Color.hermes.opacity(0.15)).cornerRadius(4).foregroundColor(.hermes)
@@ -466,7 +407,7 @@ struct TBtn: View {
         Button(action: action) {
             HStack(spacing: 2) {
                 Image(systemName: icon).font(.caption)
-                Text(label).font(.system(size: 9, design: .monospaced))
+                Text(label).font(.system(size: 10, design: .monospaced))
             }
             .padding(.horizontal, 6).padding(.vertical, 3)
             .background(disabled ? Color.gray.opacity(0.1) : Color.hermes.opacity(0.1)).cornerRadius(4)
@@ -483,7 +424,7 @@ struct BuildLogView: View {
         VStack(spacing: 0) {
             HStack {
                 Text(isBuilding ? "Building..." : "Build Log")
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundColor(isBuilding ? .hermes : .green)
                 Spacer()
                 Button(action: onClose) { Image(systemName: "xmark.circle.fill").font(.caption).foregroundColor(.secondary) }
@@ -492,22 +433,12 @@ struct BuildLogView: View {
             .padding(.horizontal, 8).padding(.vertical, 4)
             ScrollViewReader { proxy in
                 ScrollView {
-                    Text(log.joined()).font(.system(size: 8, design: .monospaced)).foregroundColor(Color(white: 0.6))
+                    Text(log.joined()).font(.system(size: 10, design: .monospaced)).foregroundColor(Color(white: 0.6))
                         .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled).id("logBottom")
                 }
                 .onChange(of: log.count) { _, _ in withAnimation { proxy.scrollTo("logBottom") } }
             }
         }
-    }
-}
-
-// MARK: - Build Delegate
-
-extension HermesChatView: XcodeBuildDelegate {
-    func buildOutputReceived(_ line: String) { buildLog.append(line); if !showBuildLog { showBuildLog = true } }
-    func buildFinished(exitCode: Int32) {
-        isBuilding = false
-        buildLog.append("\n\(exitCode == 0 ? "Build Succeeded" : "Build Failed (exit \(exitCode))")\n")
     }
 }
 
@@ -525,7 +456,7 @@ struct SelectionPill: View {
     }
 }
 
-// MARK: - Gateway Status
+// MARK: - Gateway Status (kept for compatibility, not directly used in tab layout)
 
 struct GatewayStatusDot: View {
     @State private var isReachable = false; @State private var checking = true
