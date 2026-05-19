@@ -53,7 +53,7 @@ struct CronSettingsView: View {
             // Header
             HStack {
                 Text("Scheduled Tasks")
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .font(.system(size: 13, weight: .bold, design: .monospaced))
                     .foregroundColor(.hermes)
                 Spacer()
                 Button { showAddSheet = true } label: {
@@ -70,9 +70,9 @@ struct CronSettingsView: View {
                 Spacer()
                 VStack(spacing: 8) {
                     Text("No scheduled tasks")
-                        .font(.system(size: 13, design: .monospaced)).foregroundColor(.secondary)
+                        .font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
                     Text("Click + to add one")
-                        .font(.system(size: 11, design: .monospaced)).foregroundColor(.gray)
+                        .font(.system(size: 9, design: .monospaced)).foregroundColor(.gray)
                 }
                 .frame(maxWidth: .infinity)
                 Spacer()
@@ -149,10 +149,10 @@ struct TaskRow: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(task.name)
-                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundColor(.white)
                 Text(task.schedule.label)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(size: 8, design: .monospaced))
                     .foregroundColor(.secondary)
             }
 
@@ -186,19 +186,19 @@ struct AddTaskSheet: View {
     var body: some View {
         VStack(spacing: 16) {
             Text("New Scheduled Task")
-                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
                 .foregroundColor(.hermes)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Name").font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
+                Text("Name").font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary)
                 TextField("e.g. Nightly Build Check", text: $name)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 13, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .padding(8).background(Color(white: 0.15)).cornerRadius(6)
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Schedule").font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
+                Text("Schedule").font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary)
                 Picker("", selection: $schedule) {
                     ForEach(CronSchedule.allCases, id: \.self) { s in
                         Text(s.label).tag(s)
@@ -208,9 +208,9 @@ struct AddTaskSheet: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Prompt").font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
+                Text("Prompt").font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary)
                 TextEditor(text: $prompt)
-                    .font(.system(size: 13, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.white)
                     .scrollContentBackground(.hidden)
                     .padding(8).background(Color(white: 0.15)).cornerRadius(6)

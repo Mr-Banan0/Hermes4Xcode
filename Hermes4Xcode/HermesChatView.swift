@@ -30,11 +30,12 @@ struct HermesChatView: View {
     private let welcomeMessage = StructuredMessage(
         role: "assistant",
         segments: [.text(
-            "#  #  ####  ###  #  #  ###  ####  #### ##   ## #  #  ###   ##   ###  #### \n" +
-            "## ## #    #   # #  # #   # #    #    #  # ## ## #  # #   # #  # #   #    \n" +
-            "##### ###    #   ####  #   ###  ###  #    ## ## ###  #  ##  #  # #   ###  \n" +
-            "#   # #    #   #    ## #   #    #    #  # #  # #  # #  # #  # #  # #    \n" +
-            "#   # #### ###     # #  #  ###  #### #### ##   ## #  #  ###   ##  ###  #### \n\n" +
+            "██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗\n" +
+            "██║  ██║██╔════╝██╔══██╗████╗ ████║██╔════╝██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝\n" +
+            "███████║█████╗  ██████╔╝██╔████╔██║█████╗  ███████╗█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║\n" +
+            "██╔══██║██╔══╝  ██╔══██╗██║╚██╔╝██║██╔══╝  ╚════██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║\n" +
+            "██║  ██║███████╗██║  ██║██║ ╚═╝ ██║███████╗███████║      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║\n" +
+            "╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝\n\n" +
             "Select code in Xcode, then chat with me below.\n\n" +
             "  \u{2022} \u{1F3D7} Build \u{2014} compile\n  \u{2022} \u{1F9EA} Test \u{2014} run/create tests\n  \u{2022} \u{26A1} Quick \u{2014} fix, review, refactor\n  \u{2022} \u{1F504} Refresh \u{2014} detect Xcode selection"
         )],
@@ -46,7 +47,7 @@ struct HermesChatView: View {
             // Title Bar
             HStack {
                 Text("Hermes4Xcode")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundColor(.hermes)
                 Spacer()
                 HStack(spacing: 4) {
@@ -121,7 +122,7 @@ struct HermesChatView: View {
                         .focused($isInputFocused)
                         .onSubmit(send)
                         .disabled(isStreaming)
-                        .font(.system(size: 13, design: .monospaced))
+                        .font(.system(size: 12, design: .monospaced))
                         .foregroundColor(.white)
                         .padding(.horizontal, 10).padding(.vertical, 8)
                         .background(Color(white: 0.12))
@@ -319,10 +320,10 @@ struct TerminalMessageView: View {
                     Spacer(minLength: 40)
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("You")
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
                             .foregroundColor(.hermesAmber)
                         Text(msg.rawText)
-                            .font(.system(size: 13, design: .monospaced))
+                            .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(Color(white: 0.9))
                             .textSelection(.enabled)
                             .padding(10)
@@ -378,7 +379,7 @@ struct SegmentView: View {
         switch segment {
         case .text(let t):
             Text(t)
-                .font(.system(size: 13, design: .monospaced))
+                .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(Color(white: 0.85))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -386,9 +387,9 @@ struct SegmentView: View {
         case .toolCall(let icon, let name, let status, let detail):
             HStack(spacing: 6) {
                 Image(systemName: icon).font(.caption).foregroundColor(statusColor(status))
-                Text(status.rawValue + " " + name).font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundColor(statusColor(status))
+                Text(status.rawValue + " " + name).font(.system(size: 9, weight: .semibold, design: .monospaced)).foregroundColor(statusColor(status))
                 Spacer()
-                Text(detail).font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary).lineLimit(1)
+                Text(detail).font(.system(size: 8, design: .monospaced)).foregroundColor(.secondary).lineLimit(1)
             }
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(Color(white: 0.12)).cornerRadius(4)
@@ -398,15 +399,15 @@ struct SegmentView: View {
                 if !file.isEmpty {
                     HStack {
                         Image(systemName: "doc.badge.plus").font(.caption).foregroundColor(.hermes)
-                        Text(file).font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
+                        Text(file).font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary)
                         Spacer()
                         Button("Apply") {
                             DispatchQueue.global().async { _ = XcodeContextProvider.shared.replaceSelection(with: code) }
-                        }.font(.system(size: 11, design: .monospaced)).buttonStyle(.plain).foregroundColor(.hermes)
+                        }.font(.system(size: 8, design: .monospaced)).buttonStyle(.plain).foregroundColor(.hermes)
                     }
                 }
                 ScrollView(.horizontal, showsIndicators: false) {
-                    Text(code).font(.system(size: 11, design: .monospaced)).foregroundColor(Color(white: 0.8)).textSelection(.enabled)
+                    Text(code).font(.system(size: 10, design: .monospaced)).foregroundColor(Color(white: 0.8)).textSelection(.enabled)
                 }
                 .padding(8).background(Color(white: 0.08)).cornerRadius(6)
             }
@@ -428,7 +429,7 @@ struct XcodeToolbarView: View {
     var body: some View {
         HStack(spacing: 4) {
             if let file = currentFile {
-                Text(file).font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary).lineLimit(1)
+                Text(file).font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary).lineLimit(1)
             }
             Spacer()
             TBtn(icon: "doc.text.magnifyingglass", label: "Read", action: onReadFile, disabled: isBuilding)
@@ -449,7 +450,7 @@ struct XcodeToolbarView: View {
             } label: {
                 HStack(spacing: 2) {
                     Image(systemName: "bolt.fill").font(.caption)
-                    Text("Quick").font(.system(size: 11, design: .monospaced))
+                    Text("Quick").font(.system(size: 9, design: .monospaced))
                 }
                 .padding(.horizontal, 6).padding(.vertical, 3)
                 .background(Color.hermes.opacity(0.15)).cornerRadius(4).foregroundColor(.hermes)
@@ -465,7 +466,7 @@ struct TBtn: View {
         Button(action: action) {
             HStack(spacing: 2) {
                 Image(systemName: icon).font(.caption)
-                Text(label).font(.system(size: 11, design: .monospaced))
+                Text(label).font(.system(size: 9, design: .monospaced))
             }
             .padding(.horizontal, 6).padding(.vertical, 3)
             .background(disabled ? Color.gray.opacity(0.1) : Color.hermes.opacity(0.1)).cornerRadius(4)
@@ -482,7 +483,7 @@ struct BuildLogView: View {
         VStack(spacing: 0) {
             HStack {
                 Text(isBuilding ? "Building..." : "Build Log")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundColor(isBuilding ? .hermes : .green)
                 Spacer()
                 Button(action: onClose) { Image(systemName: "xmark.circle.fill").font(.caption).foregroundColor(.secondary) }
@@ -491,7 +492,7 @@ struct BuildLogView: View {
             .padding(.horizontal, 8).padding(.vertical, 4)
             ScrollViewReader { proxy in
                 ScrollView {
-                    Text(log.joined()).font(.system(size: 11, design: .monospaced)).foregroundColor(Color(white: 0.6))
+                    Text(log.joined()).font(.system(size: 8, design: .monospaced)).foregroundColor(Color(white: 0.6))
                         .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled).id("logBottom")
                 }
                 .onChange(of: log.count) { _, _ in withAnimation { proxy.scrollTo("logBottom") } }
@@ -516,7 +517,7 @@ struct SelectionPill: View {
     let context: XcodeSelectionContext; let onDismiss: () -> Void
     var body: some View {
         HStack(spacing: 4) {
-            Text(context.summary).font(.system(size: 11, design: .monospaced)).foregroundColor(.hermes)
+            Text(context.summary).font(.system(size: 9, design: .monospaced)).foregroundColor(.hermes)
             Button(action: onDismiss) { Image(systemName: "xmark").font(.system(size: 8)).foregroundColor(.secondary) }.buttonStyle(.plain)
         }
         .padding(.horizontal, 8).padding(.vertical, 3)
@@ -532,7 +533,7 @@ struct GatewayStatusDot: View {
         HStack(spacing: 3) {
             Circle().fill(checking ? Color.gray : (isReachable ? Color.green : Color.red)).frame(width: 6, height: 6)
             Text(checking ? "..." : (isReachable ? "Connected" : "Offline"))
-                .font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
+                .font(.system(size: 8, design: .monospaced)).foregroundColor(.secondary)
         }
         .onAppear { checkGateway() }
     }
