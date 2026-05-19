@@ -3,21 +3,38 @@ import AppKit
 
 @main
 struct Hermes4XcodeApp: App {
+    @State private var selectedPage: AppPage = .chat
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
         WindowGroup(id: "main") {
-            HermesChatView(initialCode: nil)
-                .frame(minWidth: 420, minHeight: 540)
-                .preferredColorScheme(.dark)
-                .background(Color.black)
-                .onAppear {
-                    DispatchQueue.global().async {
-                        if SourceKitLSPClient.shared.start() {
-                            NSLog("[Hermes4Xcode] SourceKit-LSP started")
-                        }
+            HSplitView {
+                // Left sidebar
+                SidebarView(selectedPage: $selectedPage)
+                    .frame(minWidth: 56, maxWidth: 56)
+
+                // Main content
+                Group {
+                    switch selectedPage {
+                    case .chat:
+                        HermesChatView(initialCode: nil)
+                    case .cron:
+                        CronSettingsView()
+                    case .provider:
+                        ProviderSettingsView()
                     }
                 }
+                .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(minWidth: 480, minHeight: 540)
+            .preferredColorScheme(.dark)
+            .onAppear {
+                DispatchQueue.global().async {
+                    if SourceKitLSPClient.shared.start() {
+                        NSLog("[Hermes4Xcode] SourceKit-LSP started")
+                    }
+                }
+            }
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
@@ -43,9 +60,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.isMovableByWindowBackground = true
             window.backgroundColor = .black
 
-            // Position right side of screen
             if let screenFrame = NSScreen.main?.visibleFrame {
-                let w: CGFloat = 460
+                let w: CGFloat = 560
                 let h: CGFloat = 700
                 let x = screenFrame.maxX - w - 20
                 let y = screenFrame.maxY - h - 40
