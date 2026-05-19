@@ -14,6 +14,86 @@
 
 **Hermes4Xcode** is a macOS companion app for Xcode that provides agentic coding assistance through the [Hermes Agent](https://hermes-agent.nousresearch.com) Gateway API. It sits alongside Xcode as a floating panel — you select code, chat with the agent, and it can read, modify, build, and test your project.
 
+---
+
+## Prerequisites
+
+Before you can run this app, you need the following:
+
+### 1. Xcode & macOS
+
+| Requirement | Minimum Version |
+|-------------|----------------|
+| macOS | 15.0 (Sequoia) |
+| Xcode | 26+ |
+| Command Line Tools | `xcode-select --install` |
+
+### 2. Hermes Agent (Required)
+
+This app requires the **Hermes Agent Gateway API** running in the background. The app connects to `http://127.0.0.1:8642/v1` to send code and receive agent responses.
+
+```bash
+# Install Hermes Agent (one-time)
+curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
+
+# Start the Gateway API server
+hermes gateway start
+
+# Verify it's running
+curl http://127.0.0.1:8642/v1/models
+# Expected: {"object": "list", "data": [{"id": "hermes-agent", ...}]}
+```
+
+> **Note:** The Gateway must be running every time you use Hermes4Xcode. The app will show a red "Offline" indicator at the top if Gateway is not running.
+
+### 3. Apple Events Permission (Required for Xcode Integration)
+
+For the app to read your selected code and write code back to Xcode, you need to grant automation permission:
+
+1. Run the app once (it will try to access Xcode)
+2. Open **System Settings → Privacy & Security → Automation**
+3. Find **Hermes4Xcode** in the list
+4. Toggle the checkbox next to **Xcode**
+
+> If you don't see Hermes4Xcode in the list, click the refresh button (🔄) inside the app while Xcode has a file open — macOS will prompt you to allow access.
+
+### 4. (Optional) In-Xcode Chat Provider
+
+If you want to chat with Hermes directly inside Xcode's chat panel:
+
+1. Open **Xcode → Settings → Intelligence**
+2. Click **Add Custom Provider**
+3. Set Name: `Hermes`, URL: `http://127.0.0.1:8642/v1`
+4. Leave API Key blank (localhost)
+
+---
+
+## Quick Start
+
+```bash
+# 1. Clone
+git clone https://github.com/Mr-Banan0/Hermes4Xcode.git
+cd Hermes4Xcode
+
+# 2. Open in Xcode
+open Hermes4Xcode.xcodeproj
+
+# 3. Make sure Gateway is running
+hermes gateway status
+
+# 4. Build & Run (Cmd+R in Xcode)
+```
+
+### Post-Launch Checklist
+
+| Check | How |
+|-------|-----|
+| 🟢 Gateway connected? | Look for green dot in top-right of the app |
+| 📄 Xcode selection detected? | Select code in Xcode, click the app — a pill appears above input |
+| 🏗 Build works? | Click Build button in the toolbar |
+
+---
+
 ## Features
 
 | Phase | Feature | Status |
@@ -28,32 +108,7 @@
 | 4 | Project structure scanning, cross-session memory | ✅ |
 | 5 | SourceKit-LSP code analysis | ✅ |
 
-## Prerequisites
-
-- **macOS 15+** (Sequoia)
-- **Xcode 26+**
-- **Hermes Agent** with Gateway API running:
-
-```bash
-hermes gateway start
-```
-
-The Gateway listens on `http://127.0.0.1:8642/v1`.
-
-## Quick Start
-
-```bash
-# Open in Xcode
-open Hermes4Xcode.xcodeproj
-
-# Build & Run (Cmd+R)
-# The floating panel appears on the right side of the screen
-```
-
-### First-Time Setup
-
-1. **System Settings → Privacy & Security → Automation** → grant **Hermes4Xcode** permission to control **Xcode** (for selection detection and code replacement)
-2. **Xcode → Settings → Intelligence → Add Custom Provider** (optional): add `http://127.0.0.1:8642/v1` for in-Xcode chat
+---
 
 ## Usage
 
@@ -62,21 +117,23 @@ open Hermes4Xcode.xcodeproj
 | Button | Action |
 |--------|--------|
 | **Read** | Fetch current Xcode file content into chat input |
-| **Build** | Compile the active Xcode scheme |
-| **Test** | Run tests (or choose to create a test target) |
-| **Quick** | Menu: fix build errors, generate tests, review file, refactor, commit message, project structure, LSP analysis |
+| **Build** | Compile the active Xcode scheme (output shown in bottom panel) |
+| **Test** | Run tests; if no test target exists, prompts to create one |
+| **Quick** | Menu: fix build errors, generate tests, review, refactor, commit message, project structure, LSP analysis |
 
 ### Chat
 
-Select code in Xcode, then click the Hermes4Xcode window. A context pill appears above the input showing the selected file and lines. Type your question and the agent responds with the file context attached.
+Select code in Xcode, then click the Hermes4Xcode window. A gold pill appears above the input showing the selected file and line range. Type your question and the agent responds with the file context automatically attached.
 
-When the agent returns a ` ```swift ` code block, it is automatically applied to the Xcode selection.
+When the agent returns a `` ```swift `` code block, it is automatically applied to the Xcode selection. You can also click **"Replace in Xcode"** on any assistant message that contains a code block.
+
+---
 
 ## Project Structure
 
 ```
 Hermes4Xcode/
-├── Hermes4Xcode.xcodeproj/       # Xcode project
+├── Hermes4Xcode.xcodeproj/       # Xcode project (open this)
 ├── Hermes4Xcode.xcworkspace/     # Xcode workspace
 ├── Hermes4Xcode/                 # App source code
 │   ├── HermesXcodeApp.swift      # App entry (WindowGroup + dark theme)
@@ -88,28 +145,38 @@ Hermes4Xcode/
 │   ├── HermesColor.swift         # Brand colors (#FFD700 / #FFBF00)
 │   └── Assets.xcassets/          # App icon + accent color
 ├── Config/                       # xcconfig build settings
+├── .gitignore
 └── README.md
 ```
+
+---
 
 ## Architecture
 
 ```
                   ┌──────────────────┐
-                  │   Hermes4Xcode    │
-                  │   (macOS App)     │
-                  │                   │
-  ┌─────────┐     │  ┌─────────────┐  │     ┌──────────────┐
-  │  Xcode   │◄────┤  │ AppleScript │  │     │ Hermes       │
-  │  (IDE)   │─────►│  │ (read/edit) │  │     │ Gateway API  │
-  └─────────┘     │  └─────────────┘  │     │ (port 8642)  │
-                  │         │         │     └──────┬───────┘
-                  │         ▼         │            │
-                  │  ┌─────────────┐  │     ┌──────┴───────┐
-                  │  │ SSE Client  │────────►│ Hermes Agent │
-                  │  │ (chat)      │  │     │ (+ tool loop)│
-                  │  └─────────────┘  │     └──────────────┘
+                  │   Hermes4Xcode    │     ┌──────────────┐
+                  │   (macOS App)     │     │              │
+  ┌─────────┐     │  ┌─────────────┐  │     │ Hermes       │
+  │  Xcode   │◄────┤  │ AppleScript │  │     │ Gateway API  │
+  │  (IDE)   │─────►│  │ (read/edit) │  │     │ (port 8642)  │
+  └─────────┘     │  └──────┬──────┘  │     └──────┬───────┘
+                  │         │         │            │
+                  │         ▼         │     ┌──────┴───────┐
+                  │  ┌─────────────┐  │     │ Hermes Agent │
+                  │  │ SSE Client  │────────►│ (+ tool loop)│
+                  │  │ (chat)      │  │     └──────────────┘
+                  │  └─────────────┘  │
                   └──────────────────┘
+
+Actions:
+  • Start Gateway → hermes gateway start
+  • Gateway URL  → http://127.0.0.1:8642/v1
+  • Build Xcode  → xcodebuild via AppleScript
+  • Analyze code → SourceKit-LSP (background)
 ```
+
+---
 
 ## Key Bindings
 
@@ -118,6 +185,19 @@ Hermes4Xcode/
 | `Enter` | Send message |
 | `Tab` | Focus input field |
 | `Esc` | Close build log panel |
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Red "Offline" dot | Run `hermes gateway start` in terminal |
+| App can't read Xcode selection | Grant Automation permission in System Settings → Privacy & Security |
+| Build button shows error | Check that Xcode has a workspace/project open |
+| "Not authorized" for Apple Events | See prerequisite #3 above |
+
+---
 
 ## License
 
