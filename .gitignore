@@ -6,6 +6,9 @@ DerivedData/
 build/
 *.build/
 
+# XcodeBuildMCP (local tool config)
+.xcodebuildmcp/
+
 # macOS
 .DS_Store
 *.swp

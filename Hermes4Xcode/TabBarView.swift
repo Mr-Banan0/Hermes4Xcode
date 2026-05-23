@@ -32,13 +32,13 @@ struct TabBarView: View {
                             }
                             editingTabId = nil
                             editName = ""
-                        }
+                        },
+                        onEditProfile: { manager.openProfileEditor(for: tab.id) }
                     )
                 }
 
                 // Add button
                 Button(action: {
-                    let count = manager.tabs.count
                     _ = manager.createTab(name: "stranger")
                 }) {
                     Image(systemName: "plus")
@@ -69,9 +69,17 @@ struct TabItemView: View {
     let onDelete: () -> Void
     let onStartEdit: () -> Void
     let onEndEdit: () -> Void
+    let onEditProfile: () -> Void
 
     var body: some View {
         HStack(spacing: 4) {
+            // Template icon
+            if !isEditing {
+                Image(systemName: tab.template.icon)
+                    .font(.system(size: 9))
+                    .foregroundColor(isActive ? .hermes : .gray.opacity(0.6))
+            }
+
             if isEditing {
                 TextField("", text: $editName)
                     .textFieldStyle(.plain)
@@ -79,12 +87,6 @@ struct TabItemView: View {
                     .foregroundColor(.white)
                     .frame(width: 80)
                     .onSubmit(onEndEdit)
-                    .onAppear {
-                        // Auto-select text
-                        DispatchQueue.main.async {
-                            // Focus management is tricky; this works for basic editing
-                        }
-                    }
             } else {
                 Text(tab.name)
                     .font(.system(size: 10, weight: isActive ? .semibold : .regular, design: .monospaced))
@@ -92,7 +94,7 @@ struct TabItemView: View {
                     .onTapGesture(count: 2) { onStartEdit() }
             }
 
-            if canDelete {
+            if canDelete && tab.name != "supervisor" {
                 Button(action: onDelete) {
                     Image(systemName: "xmark")
                         .font(.system(size: 7, weight: .bold))
@@ -111,6 +113,28 @@ struct TabItemView: View {
                 .stroke(isActive ? Color.hermes.opacity(0.3) : Color.clear, lineWidth: 1)
         )
         .onTapGesture { onSelect() }
+        .contextMenu {
+            Button {
+                onEditProfile()
+            } label: {
+                Label("Edit Agent Profile", systemImage: "slider.horizontal.3")
+            }
+
+            Button {
+                onStartEdit()
+            } label: {
+                Label("Rename", systemImage: "pencil")
+            }
+
+            if canDelete && tab.name != "supervisor" {
+                Divider()
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label("Delete Agent", systemImage: "trash")
+                }
+            }
+        }
         .padding(.trailing, 4)
     }
 }

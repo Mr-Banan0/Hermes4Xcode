@@ -1,6 +1,19 @@
 import SwiftUI
 import AppKit
 
+/// Render markdown text with fallback to plain text.
+/// Skips markdown parsing for ASCII art (contains box-drawing chars).
+func md(_ text: String) -> Text {
+    if text.contains("\u{2554}") || text.contains("\u{2557}") || text.contains("\u{2588}") || text.contains("╔") || text.contains("██") {
+        return Text(text)
+    }
+    if let attr = try? AttributedString(markdown: text) {
+        return Text(attr)
+    }
+    return Text(text)
+}
+
+
 struct HermesChatView: View {
     @ObservedObject var manager: AgentManager
     @FocusState private var isInputFocused: Bool
@@ -14,6 +27,7 @@ struct HermesChatView: View {
     let initialCode: String?
 
     var activeTab: AgentTab { manager.activeTab }
+    var permissions: AgentPermissions { activeTab.permissions }
     var messages: [StoredMessage] { activeTab.messages }
     var inputText: Binding<String> {
         Binding(
@@ -28,11 +42,17 @@ struct HermesChatView: View {
             TabBarView(manager: manager)
             Divider().background(Color.hermes.opacity(0.3))
 
-            // Toolbar
+            // Toolbar (permission-aware + mode-aware)
             XcodeToolbarView(
-                currentFile: currentFileName, isBuilding: isBuilding,
-                onReadFile: readCurrentFile, onBuild: startBuild, onTest: startTest,
-                onProjectInfo: showProjectInfo, onCancel: cancelBuild,
+                currentFile: currentFileName,
+                isBuilding: isBuilding,
+                permissions: permissions,
+                mode: $manager.mode,
+                onReadFile: permissions.readFile ? readCurrentFile : nil,
+                onBuild: permissions.build ? startBuild : nil,
+                onTest: permissions.test ? startTest : nil,
+                onProjectInfo: permissions.structure ? showProjectInfo : nil,
+                onCancel: cancelBuild,
                 onQuickAction: handleQuickAction
             )
             .padding(.horizontal, 10).padding(.vertical, 4)
@@ -135,6 +155,12 @@ struct HermesChatView: View {
                 Button("Cancel", role: .cancel) { manager.cancelCreateAgent() }
             }
         }
+        // Profile editor sheet
+        .sheet(isPresented: $manager.showProfileEditor) {
+            if let tabId = manager.editingProfileTabId {
+                AgentProfileEditor(manager: manager, tabId: tabId)
+            }
+        }
     }
 
     private func checkContext() {
@@ -211,6 +237,29 @@ struct HermesChatView: View {
     }
 
     private func handleQuickAction(_ action: String) {
+        // Check permission for each action
+        switch action {
+        case "fix_build":
+            guard permissions.build else { return }
+        case "generate_tests":
+            guard permissions.test else { return }
+        case "review", "refactor", "analyze":
+            guard permissions.analyze else { return }
+        case "commit":
+            guard permissions.commit else { return }
+        case "structure":
+            guard permissions.structure else {
+                if let s = XcodeContextProvider.shared.readProjectStructure() {
+                    manager.appendMessage(StoredMessage(role: "assistant", text: s), to: activeTab.id)
+                }
+                return
+            }
+        case "save_note":
+            guard permissions.note else { return }
+        default:
+            break
+        }
+
         let prompt: String
         switch action {
         case "fix_build": prompt = "Read the last build errors and fix them. Build again to verify."
@@ -270,7 +319,7 @@ struct TerminalMessageView: View {
                         Text("You")
                             .font(.system(size: 9, weight: .semibold, design: .monospaced))
                             .foregroundColor(.hermesAmber)
-                        Text(msg.rawText)
+                        md(msg.rawText)
                             .font(.system(size: 13, design: .monospaced))
                             .foregroundColor(Color(white: 0.9))
                             .textSelection(.enabled)
@@ -321,7 +370,7 @@ struct SegmentView: View {
     var body: some View {
         switch segment {
         case .text(let t):
-            Text(t)
+            md(t)
                 .font(.system(size: 13, design: .monospaced))
                 .foregroundColor(Color(white: 0.85))
                 .textSelection(.enabled)
@@ -360,12 +409,20 @@ struct SegmentView: View {
     }
 }
 
-// MARK: - Toolbar
+// MARK: - Permission-Aware Toolbar
 
 struct XcodeToolbarView: View {
-    let currentFile: String?; let isBuilding: Bool
-    let onReadFile: () -> Void; let onBuild: () -> Void; let onTest: () -> Void
-    let onProjectInfo: () -> Void; let onCancel: () -> Void; let onQuickAction: (String) -> Void
+    let currentFile: String?
+    let isBuilding: Bool
+    let permissions: AgentPermissions
+    @Binding var mode: ExecutionMode
+
+    let onReadFile: (() -> Void)?
+    let onBuild: (() -> Void)?
+    let onTest: (() -> Void)?
+    let onProjectInfo: (() -> Void)?
+    let onCancel: () -> Void
+    let onQuickAction: (String) -> Void
 
     var body: some View {
         HStack(spacing: 4) {
@@ -373,31 +430,86 @@ struct XcodeToolbarView: View {
                 Text(file).font(.system(size: 10, design: .monospaced)).foregroundColor(.secondary).lineLimit(1)
             }
             Spacer()
-            TBtn(icon: "doc.text.magnifyingglass", label: "Read", action: onReadFile, disabled: isBuilding)
-            TBtn(icon: "hammer.fill", label: "Build", action: onBuild, disabled: isBuilding)
-            TBtn(icon: "checkmark.circle", label: "Test", action: onTest, disabled: isBuilding)
-            if isBuilding { TBtn(icon: "stop.fill", label: "Stop", action: onCancel, disabled: false).foregroundColor(.red) }
-            Menu {
-                Button("Fix Build Errors") { onQuickAction("fix_build") }
-                Button("Generate Tests") { onQuickAction("generate_tests") }
-                Button("Review File") { onQuickAction("review") }
-                Button("Refactor") { onQuickAction("refactor") }
-                Button("Commit Message") { onQuickAction("commit") }
-                Divider()
-                Button("Project Structure") { onQuickAction("structure") }
-                Button("Save Note...") { onQuickAction("save_note") }
-                Divider()
-                Button("Analyze (LSP)") { onQuickAction("analyze") }
-            } label: {
-                HStack(spacing: 2) {
-                    Image(systemName: "bolt.fill").font(.caption)
-                    Text("Quick").font(.system(size: 10, design: .monospaced))
+
+            // Plan & ReAct mode toggle
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    mode = mode == .chat ? .plan : .chat
+                }
+            }) {
+                HStack(spacing: 3) {
+                    Image(systemName: mode.icon)
+                        .font(.system(size: 9))
+                    Text(mode.shortLabel)
+                        .font(.system(size: 9, design: .monospaced))
                 }
                 .padding(.horizontal, 6).padding(.vertical, 3)
-                .background(Color.hermes.opacity(0.15)).cornerRadius(4).foregroundColor(.hermes)
+                .background(mode == .plan ? Color.hermes.opacity(0.25) : Color(white: 0.12))
+                .cornerRadius(4)
+                .foregroundColor(mode == .plan ? .hermes : .gray)
             }
-            .menuStyle(.borderlessButton).fixedSize()
+            .buttonStyle(.plain)
+            .help(mode == .chat ? "Enable Plan & ReAct — plan first, then execute" : "Disable Plan & ReAct — chat mode")
+
+            // Permission-gated buttons
+            if let read = onReadFile {
+                TBtn(icon: "doc.text.magnifyingglass", label: "Read", action: read, disabled: isBuilding)
+            }
+            if let build = onBuild {
+                TBtn(icon: "hammer.fill", label: "Build", action: build, disabled: isBuilding)
+            }
+            if let test = onTest {
+                TBtn(icon: "checkmark.circle", label: "Test", action: test, disabled: isBuilding)
+            }
+            if isBuilding {
+                TBtn(icon: "stop.fill", label: "Stop", action: onCancel, disabled: false).foregroundColor(.red)
+            }
+
+            // Permission-gated quick menu
+            if hasQuickActions {
+                Menu {
+                    if permissions.build {
+                        Button("Fix Build Errors") { onQuickAction("fix_build") }
+                    }
+                    if permissions.test {
+                        Button("Generate Tests") { onQuickAction("generate_tests") }
+                    }
+                    if permissions.analyze {
+                        Button("Review File") { onQuickAction("review") }
+                        Button("Refactor") { onQuickAction("refactor") }
+                    }
+                    if permissions.commit {
+                        Button("Commit Message") { onQuickAction("commit") }
+                    }
+                    if permissions.structure || permissions.readFile {
+                        Divider()
+                        if permissions.structure {
+                            Button("Project Structure") { onQuickAction("structure") }
+                        }
+                    }
+                    if permissions.note {
+                        Button("Save Note...") { onQuickAction("save_note") }
+                    }
+                    if permissions.analyze {
+                        Divider()
+                        Button("Analyze (LSP)") { onQuickAction("analyze") }
+                    }
+                } label: {
+                    HStack(spacing: 2) {
+                        Image(systemName: "bolt.fill").font(.caption)
+                        Text("Quick").font(.system(size: 10, design: .monospaced))
+                    }
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .background(Color.hermes.opacity(0.15)).cornerRadius(4).foregroundColor(.hermes)
+                }
+                .menuStyle(.borderlessButton).fixedSize()
+            }
         }
+    }
+
+    private var hasQuickActions: Bool {
+        permissions.build || permissions.test || permissions.analyze ||
+        permissions.commit || permissions.structure || permissions.note
     }
 }
 

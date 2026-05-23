@@ -8,13 +8,15 @@ final class AgentManager: ObservableObject {
     @Published var activeTabId: UUID = UUID()
     @Published var isStreaming = false
     @Published var currentAssistantText = ""
+    @Published var mode: ExecutionMode = .chat
     @Published var pendingAgentName: String?
+    @Published var editingProfileTabId: UUID?         // which tab's profile is being edited
+    @Published var showProfileEditor = false
 
     // Streaming flag per tab (not persisted)
     var streamingTabs: Set<UUID> = []
     var streamingTexts: [UUID: String] = [:]
 
-    private let storageKey = "Hermes4Xcode_agentTabs"
     private let client = HermesAPIClient()
 
     // Welcome message (reconstructed from stored plain text)
@@ -22,20 +24,19 @@ final class AgentManager: ObservableObject {
         "██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗██╗  ██╗ ██████╗ ██████╗ ██████╗ ███████╗\n" +
         "██║  ██║██╔════╝██╔══██╗████╗ ████║██╔════╝██╔════╝╚██╗██╔╝██╔════╝██╔═══██╗██╔══██╗██╔════╝\n" +
         "███████║█████╗  ██████╔╝██╔████╔██║█████╗  ███████╗ ╚███╔╝ ██║     ██║   ██║██║  ██║█████╗\n" +
-        "██╔══██║██╔══╝  ██╔══██╗██║╚██╔╝██║██╔══╝  ╚════██║ ██╔██╗ ██║     ██║   ██║██║  ██║██╔══╝\n" +
+        "██╔══██║██╔══╝  ██╔══██╗██║╚██╝██║██╔══╝  ╚════██║ ██╔██╗ ██║     ██║   ██║██║  ██║██╔══╝\n" +
         "██║  ██║███████╗██║  ██║██║ ╚═╝ ██║███████╗███████║██╔╝ ██╗╚██████╗╚██████╔╝██████╔╝███████╗\n" +
         "╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝"
 
     init() {
-        load()
-        if tabs.isEmpty {
-            let welcome = StoredMessage(role: "assistant", text: welcomeText + "\n\nSelect code in Xcode, then chat with me below.")
-            var defaultTab = AgentTab(id: UUID(), name: "supervisor")
-            defaultTab.messages = [welcome]
-            tabs.append(defaultTab)
-            activeTabId = tabs[0].id
-            save()
-        }
+        let welcome = StoredMessage(role: "assistant", text: welcomeText + "\n\nLet's create our app！")
+        var defaultTab = AgentTab(id: UUID(), name: "supervisor", template: .supervisor)
+        defaultTab.roleDescription = AgentTemplate.supervisor.defaultRole
+        defaultTab.systemPrompt = AgentTemplate.supervisor.defaultPrompt
+        defaultTab.permissions = AgentTemplate.supervisor.defaultPermissions
+        defaultTab.messages = [welcome]
+        tabs.append(defaultTab)
+        activeTabId = tabs[0].id
     }
 
     // MARK: - Tab Management
@@ -48,32 +49,48 @@ final class AgentManager: ObservableObject {
         tabs.firstIndex(where: { $0.id == activeTabId }) ?? 0
     }
 
-    func createTab(name: String) -> UUID {
-        let tab = AgentTab(id: UUID(), name: name)
+    /// Create a new agent tab from a profile
+    @discardableResult
+    func createTab(from profile: AgentProfile) -> UUID {
+        var tab = AgentTab(id: profile.id, name: profile.name)
+        tab.applyProfile(profile)
         tabs.append(tab)
         activeTabId = tab.id
-        save()
         return tab.id
+    }
+
+    /// Create a tab from template (convenience)
+    @discardableResult
+    func createTab(name: String, template: AgentTemplate = .custom, role: String? = nil, prompt: String? = nil) -> UUID {
+        let profile = AgentProfile(
+            name: name,
+            template: template,
+            role: role,
+            systemPrompt: prompt
+        )
+        return createTab(from: profile)
+    }
+
+    // Keep the old API for backward compatibility with TabBarView
+    @discardableResult
+    func createTab(name: String) -> UUID {
+        createTab(name: name, template: .custom)
     }
 
     func removeTab(id: UUID) {
         guard tabs.count > 1 else { return }
-        if let idx = tabs.firstIndex(where: { $0.id == id }) {
-            let wasActive = id == activeTabId
-            tabs.remove(at: idx)
-            if wasActive {
-                activeTabId = tabs[max(0, min(idx, tabs.count - 1))].id
-            }
-            save()
+        guard let idx = tabs.firstIndex(where: { $0.id == id }),
+              tabs[idx].name != "supervisor" else { return }
+        let wasActive = id == activeTabId
+        tabs.remove(at: idx)
+        if wasActive {
+            activeTabId = tabs[max(0, min(idx, tabs.count - 1))].id
         }
     }
 
     func renameTab(id: UUID, name: String) {
         guard let idx = tabs.firstIndex(where: { $0.id == id }) else { return }
-        var tab = tabs[idx]
-        tab.name = name
-        tabs[idx] = tab
-        save()
+        tabs[idx].name = name
     }
 
     func switchToTab(id: UUID) {
@@ -81,18 +98,35 @@ final class AgentManager: ObservableObject {
         activeTabId = id
     }
 
+    // MARK: - Profile Management
+
+    func updateProfile(for tabId: UUID, _ profile: AgentProfile) {
+        guard let idx = tabs.firstIndex(where: { $0.id == tabId }) else { return }
+        tabs[idx].applyProfile(profile)
+    }
+
+    func resetProfileToTemplate(for tabId: UUID) {
+        guard let idx = tabs.firstIndex(where: { $0.id == tabId }) else { return }
+        var p = tabs[idx].profile
+        p.resetToTemplate()
+        tabs[idx].applyProfile(p)
+    }
+
+    func openProfileEditor(for tabId: UUID) {
+        editingProfileTabId = tabId
+        showProfileEditor = true
+    }
+
     // MARK: - Messages
 
     func appendMessage(_ msg: StoredMessage, to tabId: UUID) {
         guard let idx = tabs.firstIndex(where: { $0.id == tabId }) else { return }
         tabs[idx].messages.append(msg)
-        save()
     }
 
     func clearMessages(for tabId: UUID) {
         guard let idx = tabs.firstIndex(where: { $0.id == tabId }) else { return }
         tabs[idx].messages.removeAll()
-        save()
     }
 
     func updateInput(_ text: String, for tabId: UUID) {
@@ -115,11 +149,28 @@ final class AgentManager: ObservableObject {
         streamingTexts[tabId] = ""
         isStreaming = true
 
-        let history = tabs[idx].messages.map { ["role": $0.role, "content": $0.text] }
+        // Build history with system prompt prefix
+        let tab = tabs[idx]
+        var history = [[String: String]]()
+
+        // Inject mode system instruction first (if in plan mode), then agent system prompt
+        let modeInstruction = mode.systemInstruction
+        let agentPrompt = tab.effectiveSystemMessage
+        let combinedPrompt = [modeInstruction, agentPrompt]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+        if !combinedPrompt.isEmpty {
+            history.append(["role": "system", "content": combinedPrompt])
+        }
+
+        // Append conversation history
+        history += tab.messages.map { ["role": $0.role, "content": $0.text] }
 
         Task {
             await client.sendMessage(
-                text, contextCode: nil, history: history,
+                text,
+                contextCode: nil,
+                history: history,
                 onDelta: { delta in
                     Task { @MainActor in
                         self.streamingTexts[tabId] = (self.streamingTexts[tabId] ?? "") + delta
@@ -149,7 +200,6 @@ final class AgentManager: ObservableObject {
 
     func checkForAgentCreation(_ response: String) {
         let lower = response.lowercased()
-        // Pattern: "create an agent called X" / "create a X agent"
         let patterns = [
             "create an agent called ",
             "create a new agent called ",
@@ -158,7 +208,6 @@ final class AgentManager: ObservableObject {
         ]
         for pattern in patterns {
             if lower.contains(pattern) {
-                // Extract the name after the pattern
                 if let range = lower.range(of: pattern) {
                     let rest = lower[range.upperBound...].trimmingCharacters(in: .whitespaces)
                     let name = rest.split(whereSeparator: { $0 == " " || $0 == "." || $0 == "," || $0 == "\n" }).first.map(String.init) ?? "stranger"
@@ -173,7 +222,8 @@ final class AgentManager: ObservableObject {
 
     func confirmCreateAgent() {
         guard let name = pendingAgentName else { return }
-        _ = createTab(name: name)
+        // Create as custom agent — user can specialize later
+        createTab(name: name)
         let welcome = StoredMessage(role: "assistant", text: "I'm **\(name)**, a dedicated agent for this task. How can I help?")
         appendMessage(welcome, to: tabs.last?.id ?? activeTabId)
         pendingAgentName = nil
@@ -181,20 +231,5 @@ final class AgentManager: ObservableObject {
 
     func cancelCreateAgent() {
         pendingAgentName = nil
-    }
-
-    // MARK: - Persistence
-
-    private func save() {
-        if let data = try? JSONEncoder().encode(tabs) {
-            UserDefaults.standard.set(data, forKey: storageKey)
-        }
-    }
-
-    private func load() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let decoded = try? JSONDecoder().decode([AgentTab].self, from: data) else { return }
-        tabs = decoded
-        if !tabs.isEmpty { activeTabId = tabs[0].id }
     }
 }

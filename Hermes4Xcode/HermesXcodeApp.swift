@@ -13,6 +13,14 @@ struct Hermes4XcodeApp: App {
     private let maxSidebar: CGFloat = 220
     private let collapsedWidth: CGFloat = 40
 
+    /// Current sidebar width (animatable)
+    private var currentSidebarWidth: CGFloat {
+        isSidebarCollapsed ? collapsedWidth : sidebarWidth
+    }
+
+    /// Duration shared across all sidebar animations
+    private let animDuration: Double = 0.2
+
     var body: some Scene {
         WindowGroup(id: "main") {
             HStack(spacing: 0) {
@@ -20,13 +28,19 @@ struct Hermes4XcodeApp: App {
                 SidebarView(
                     selectedPage: $selectedPage,
                     isCollapsed: $isSidebarCollapsed,
-                    onToggleCollapse: { withAnimation(.easeInOut(duration: 0.15)) { isSidebarCollapsed.toggle() } }
+                    onToggleCollapse: {
+                        withAnimation(.easeInOut(duration: animDuration)) {
+                            isSidebarCollapsed.toggle()
+                        }
+                    }
                 )
-                .frame(width: isSidebarCollapsed ? collapsedWidth : sidebarWidth)
+                .frame(width: currentSidebarWidth)
+                .animation(.easeInOut(duration: animDuration), value: isSidebarCollapsed)
 
-                // Drag handle
+                // Drag handle — fades + slides in/out with sidebar
                 if !isSidebarCollapsed {
                     DragHandle(width: $sidebarWidth, minWidth: minSidebar, maxWidth: maxSidebar)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
                 }
 
                 // Main content
@@ -45,6 +59,7 @@ struct Hermes4XcodeApp: App {
             .frame(minWidth: 480, minHeight: 540)
             .preferredColorScheme(.dark)
             .background(Color.black)
+            .animation(.easeInOut(duration: animDuration), value: isSidebarCollapsed)
             .onAppear {
                 DispatchQueue.global().async {
                     if SourceKitLSPClient.shared.start() {
