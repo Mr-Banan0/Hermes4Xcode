@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 /// Render markdown text with fallback to plain text.
 /// Skips markdown parsing for ASCII art (contains box-drawing chars).

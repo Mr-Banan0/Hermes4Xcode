@@ -1,6 +1,6 @@
-import XCTest
-import SwiftUI
 @testable import HermesXcode
+import SwiftUI
+import XCTest
 
 final class HermesColorTests: XCTestCase {
 
@@ -24,7 +24,7 @@ final class HermesColorTests: XCTestCase {
         let colors: [(String, Color)] = [
             ("gold", Color.hermes),
             ("amber", Color.hermesAmber),
-            ("light", Color.hermesLight),
+            ("light", Color.hermesLight)
         ]
         // Verify they're all different colors by checking raw component access
         // We can at least verify they're not clear/black

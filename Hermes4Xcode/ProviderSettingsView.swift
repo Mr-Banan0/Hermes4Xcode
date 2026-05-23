@@ -23,7 +23,7 @@ let AvailableProviders: [(name: String, defaultModel: String, defaultURL: String
     ("xiaomi", "mimo-v2-flash", "https://api.xiaomimimo.com/v1"),
     ("novita", "deepseek/deepseek-v4-flash", "https://api.novita.ai/v3/openai"),
     ("qwen", "qwen-max", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-    ("ollama", "llama3.2", "http://localhost:11434/v1"),
+    ("ollama", "llama3.2", "http://localhost:11434/v1")
 ]
 
 // MARK: - Provider Settings View
@@ -159,7 +159,7 @@ struct ProviderSettingsView: View {
         .background(Color.black)
     }
 
-    private func testConnection() {
+    func testConnection() {
         isTesting = true
         testResult = nil
 
@@ -207,10 +207,10 @@ struct ProviderSettingsView: View {
             UserDefaults.standard.set(data, forKey: storageKey)
         }
         // Also try to update hermes config
-        let _ = XcodeContextProvider.shared.runShell(
+        _ = XcodeContextProvider.shared.runShell(
             "hermes config set model.provider '\(config.provider)' 2>/dev/null"
         )
-        let _ = XcodeContextProvider.shared.runShell(
+        _ = XcodeContextProvider.shared.runShell(
             "hermes config set model.default '\(config.model)' 2>/dev/null"
         )
         testResult = "Saved to Hermes config ✅"

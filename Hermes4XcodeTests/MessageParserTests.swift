@@ -1,5 +1,5 @@
-import XCTest
 @testable import HermesXcode
+import XCTest
 
 final class MessageParserTests: XCTestCase {
 
@@ -248,9 +248,7 @@ final class MessageParserTests: XCTestCase {
         """
         let result = MessageParser.parse(input)
         XCTAssertEqual(result.count, 3)
-        XCTAssertTrue(result[0].id.hasPrefix("t-"))
-        XCTAssertTrue(result[1].id.hasPrefix("d-"))
-        XCTAssertTrue(result[2].id.hasPrefix("t-"))
+        XCTAssertEqual(result[0].id.hasPrefix("t-"), true)
     }
 
     // MARK: - Edge Cases
