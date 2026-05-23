@@ -39,6 +39,7 @@
 			children = (
 				8B90D1BC2DEE373300FBD189 /* Config */,
 				8BC2655E2DEDD3F400F279A4 /* Hermes4Xcode */,
+				8BC265A92DED4000F280A4 /* Hermes4XcodeTests */,
 				8BC2655D2DEDD3F400F279A4 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -47,6 +48,7 @@
 			isa = PBXGroup;
 			children = (
 				8BC2655C2DEDD3F400F279A4 /* HermesXcode.app */,
+				8BC265A22DED4000F280A4 /* HermesXcode Tests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -89,6 +91,10 @@
 					8BC2655B2DEDD3F400F279A4 = {
 						CreatedOnToolsVersion = 16.3;
 					};
+					8BC265A12DED4000F280A4 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = 8BC2655B2DEDD3F400F279A4;
+					};
 				};
 			};
 			buildConfigurationList = 8BC265572DEDD3F400F279A4 /* Build configuration list for PBXProject "Hermes4Xcode" */;
@@ -106,6 +112,7 @@
 			projectRoot = "";
 			targets = (
 				8BC2655B2DEDD3F400F279A4 /* Hermes4Xcode */,
+				8BC265A12DED4000F280A4 /* Hermes4XcodeTests */,
 			);
 		};
 /* End PBXProject section */
@@ -182,6 +189,126 @@
 			buildConfigurations = (
 				8BC2657F2DEDD3F500F279A4 /* Debug */,
 				8BC265802DEDD3F500F279A4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin PBXFileReference section */
+		8BC265A22DED4000F280A4 /* HermesXcode Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "HermesXcode Tests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		8BC265A92DED4000F280A4 /* Hermes4XcodeTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Hermes4XcodeTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8BC265A42DED4000F280A4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		8BC265A12DED4000F280A4 /* Hermes4XcodeTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8BC265A82DED4000F280A4 /* Build configuration list for PBXNativeTarget "Hermes4XcodeTests" */;
+			buildPhases = (
+				8BC265A32DED4000F280A4 /* Sources */,
+				8BC265A42DED4000F280A4 /* Frameworks */,
+				8BC265A52DED4000F280A4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8BC265AA2DED4000F280A4 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				8BC265A92DED4000F280A4 /* Hermes4XcodeTests */,
+			);
+			name = Hermes4XcodeTests;
+			productName = Hermes4XcodeTests;
+			productReference = 8BC265A22DED4000F280A4 /* HermesXcode Tests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXTargetDependency section */
+		8BC265AA2DED4000F280A4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8BC2655B2DEDD3F400F279A4 /* Hermes4Xcode */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXSourcesBuildPhase section */
+		8BC265A32DED4000F280A4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		8BC265A52DED4000F280A4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		8BC265A62DED4000F280A4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 8B90D1BC2DEE373300FBD189 /* Config */;
+			baseConfigurationReferenceRelativePath = Tests.xcconfig;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hermes.xcodeext;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HermesXcode.app/Contents/MacOS/HermesXcode";
+			};
+			name = Debug;
+		};
+		8BC265A72DED4000F280A4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 8B90D1BC2DEE373300FBD189 /* Config */;
+			baseConfigurationReferenceRelativePath = Tests.xcconfig;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hermes.xcodeext;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HermesXcode.app/Contents/MacOS/HermesXcode";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		8BC265A82DED4000F280A4 /* Build configuration list for PBXNativeTarget "Hermes4XcodeTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8BC265A62DED4000F280A4 /* Debug */,
+				8BC265A72DED4000F280A4 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

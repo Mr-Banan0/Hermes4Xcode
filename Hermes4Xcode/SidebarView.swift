@@ -2,58 +2,87 @@ import SwiftUI
 
 struct SidebarView: View {
     @Binding var selectedPage: AppPage
+    @Binding var isCollapsed: Bool
+    let onToggleCollapse: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            // Logo
-            VStack(spacing: 2) {
-                Text("⚡")
-                    .font(.title2)
-                Text("H4X")
-                    .font(.system(size: 8, weight: .heavy, design: .monospaced))
+            // Toggle button — leading in expanded, centered in collapsed
+            Button(action: onToggleCollapse) {
+                Image(systemName: isCollapsed ? "line.3.horizontal" : "sidebar.left")
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.hermes)
             }
-            .padding(.top, 12)
-            .padding(.bottom, 16)
+            .buttonStyle(.plain)
+            .frame(height: 36)
+            .frame(maxWidth: .infinity, alignment: isCollapsed ? .center : .leading)
+            .padding(.leading, isCollapsed ? 0 : 12)
 
             Divider().background(Color.hermes.opacity(0.2))
-                .padding(.horizontal, 6)
+                .padding(.horizontal, isCollapsed ? 0 : 8)
 
-            // Menu items
-            ForEach(AppPage.allCases) { page in
-                SidebarItem(
-                    icon: page.icon,
-                    label: page.label,
-                    isSelected: selectedPage == page
-                )
-                .onTapGesture { selectedPage = page }
-                .padding(.top, 4)
+            if isCollapsed {
+                // ── Collapsed: icons only, tight ──
+                collapsedContent
+                    .transition(.opacity)
+            } else {
+                // ── Expanded: icon + label ──
+                expandedContent
+                    .transition(.opacity)
             }
 
-            Spacer()
+            Spacer(minLength: 0)
         }
-        .frame(width: 56)
+        .frame(maxWidth: .infinity, alignment: .top)
         .background(Color(white: 0.08))
+        .animation(.easeInOut(duration: 0.2), value: isCollapsed)
     }
-}
 
-struct SidebarItem: View {
-    let icon: String
-    let label: String
-    let isSelected: Bool
+    // MARK: - Collapsed: icon only, centered in 40px
 
-    var body: some View {
-        VStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundColor(isSelected ? .hermes : .gray)
-            Text(label)
-                .font(.system(size: 7, weight: isSelected ? .bold : .regular, design: .monospaced))
-                .foregroundColor(isSelected ? .hermes : .gray)
-                .lineLimit(1)
+    private var collapsedContent: some View {
+        VStack(spacing: 4) {
+            ForEach(AppPage.allCases) { page in
+                Image(systemName: page.icon)
+                    .font(.system(size: 16))
+                    .foregroundColor(selectedPage == page ? .hermes : .gray)
+                    .frame(width: 34, height: 34)
+                    .background(selectedPage == page ? Color.hermes.opacity(0.15) : Color.clear)
+                    .cornerRadius(6)
+                    .onTapGesture { selectedPage = page }
+            }
         }
-        .frame(width: 48, height: 48)
-        .background(isSelected ? Color.hermes.opacity(0.15) : Color.clear)
-        .cornerRadius(8)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Expanded: full row with label
+
+    private var expandedContent: some View {
+        VStack(spacing: 0) {
+            ForEach(AppPage.allCases) { page in
+                HStack(spacing: 8) {
+                    Image(systemName: page.icon)
+                        .font(.system(size: 14))
+                        .foregroundColor(selectedPage == page ? .hermes : .gray)
+                        .frame(width: 20)
+
+                    Text(page.label)
+                        .font(.system(size: 11,
+                                      weight: selectedPage == page ? .semibold : .regular,
+                                      design: .monospaced))
+                        .foregroundColor(selectedPage == page ? .hermes : .gray)
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background(selectedPage == page ? Color.hermes.opacity(0.12) : Color.clear)
+                .cornerRadius(6)
+                .onTapGesture { selectedPage = page }
+                .padding(.horizontal, 6)
+                .padding(.top, 2)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
