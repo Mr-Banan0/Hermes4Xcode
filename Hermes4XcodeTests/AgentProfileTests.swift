@@ -1,5 +1,5 @@
-import XCTest
 @testable import HermesXcode
+import XCTest
 
 final class AgentPermissionsTests: XCTestCase {
 

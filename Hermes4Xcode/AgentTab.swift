@@ -65,14 +65,14 @@ struct AgentTab: Identifiable, Codable {
     /// Human-readable permission summary for display
     var permissionSummary: String {
         var parts: [String] = []
-        if permissions.readFile   { parts.append("read") }
-        if permissions.writeCode  { parts.append("write") }
-        if permissions.build      { parts.append("build") }
-        if permissions.test       { parts.append("test") }
-        if permissions.analyze    { parts.append("analyze") }
-        if permissions.commit     { parts.append("commit") }
-        if permissions.structure  { parts.append("structure") }
-        if permissions.note       { parts.append("note") }
+        if permissions.readFile { parts.append("read") }
+        if permissions.writeCode { parts.append("write") }
+        if permissions.build { parts.append("build") }
+        if permissions.test { parts.append("test") }
+        if permissions.analyze { parts.append("analyze") }
+        if permissions.commit { parts.append("commit") }
+        if permissions.structure { parts.append("structure") }
+        if permissions.note { parts.append("note") }
         return parts.joined(separator: ", ")
     }
 }

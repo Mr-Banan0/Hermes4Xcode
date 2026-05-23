@@ -106,7 +106,7 @@ struct CronSettingsView: View {
         tasks.removeAll { $0.id == task.id }
         saveTasks()
         // Remove from hermes cron
-        let _ = XcodeContextProvider.shared.runShell("hermes cron remove \(task.id.uuidString) 2>/dev/null")
+        _ = XcodeContextProvider.shared.runShell("hermes cron remove \(task.id.uuidString) 2>/dev/null")
     }
 
     private func saveTasks() {
@@ -125,11 +125,11 @@ struct CronSettingsView: View {
         if task.isEnabled {
             let expr = task.schedule.cronExpr
             let escapedPrompt = task.prompt.replacingOccurrences(of: "'", with: "'\\''")
-            let _ = XcodeContextProvider.shared.runShell(
+            _ = XcodeContextProvider.shared.runShell(
                 "hermes cron create '\(expr)' --name '\(task.name)' --prompt '\(escapedPrompt)' 2>/dev/null"
             )
         } else {
-            let _ = XcodeContextProvider.shared.runShell("hermes cron pause \(task.id.uuidString) 2>/dev/null")
+            _ = XcodeContextProvider.shared.runShell("hermes cron pause \(task.id.uuidString) 2>/dev/null")
         }
     }
 }
@@ -227,7 +227,7 @@ struct AddTaskSheet: View {
                     // Register with hermes cron
                     let expr = schedule.cronExpr
                     let escaped = prompt.replacingOccurrences(of: "'", with: "'\\''")
-                    let _ = XcodeContextProvider.shared.runShell(
+                    _ = XcodeContextProvider.shared.runShell(
                         "hermes cron create '\(expr)' --name '\(name)' --prompt '\(escaped)' 2>/dev/null"
                     )
                     dismiss()

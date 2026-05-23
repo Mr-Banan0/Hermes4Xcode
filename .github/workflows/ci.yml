@@ -25,6 +25,9 @@ jobs:
       - name: Show Xcode Version
         run: xcodebuild -version
 
+      - name: SwiftLint
+        run: swiftlint --strict
+
       - name: Build
         run: |
           xcodebuild build \

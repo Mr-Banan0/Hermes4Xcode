@@ -13,22 +13,22 @@ struct AgentPermissions: Codable, Equatable {
     var structure: Bool = true
     var note: Bool = true
 
-    static let all = AgentPermissions(
+    static let all = Self(
         readFile: true, writeCode: true, build: true, test: true,
         analyze: true, commit: true, structure: true, note: true
     )
 
-    static let readOnly = AgentPermissions(
+    static let readOnly = Self(
         readFile: true, writeCode: false, build: false, test: false,
         analyze: true, commit: false, structure: true, note: false
     )
 
-    static let testOnly = AgentPermissions(
+    static let testOnly = Self(
         readFile: true, writeCode: true, build: true, test: true,
         analyze: true, commit: false, structure: false, note: false
     )
 
-    static let docOnly = AgentPermissions(
+    static let docOnly = Self(
         readFile: true, writeCode: false, build: false, test: false,
         analyze: false, commit: false, structure: true, note: true
     )

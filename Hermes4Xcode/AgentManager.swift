@@ -1,11 +1,11 @@
-import SwiftUI
 import Combine
+import SwiftUI
 
 // MARK: - Agent Manager
 
 final class AgentManager: ObservableObject {
     @Published var tabs: [AgentTab] = []
-    @Published var activeTabId: UUID = UUID()
+    @Published var activeTabId = UUID()
     @Published var isStreaming = false
     @Published var currentAssistantText = ""
     @Published var mode: ExecutionMode = .chat
@@ -204,7 +204,7 @@ final class AgentManager: ObservableObject {
             "create an agent called ",
             "create a new agent called ",
             "create an agent named ",
-            "create a ",
+            "create a "
         ]
         for pattern in patterns {
             if lower.contains(pattern) {

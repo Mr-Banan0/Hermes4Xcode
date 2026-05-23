@@ -32,8 +32,8 @@ struct StructuredMessage: Identifiable {
 
 // MARK: - Parser
 
-struct MessageParser {
-    /// Parse a raw assistant response into structured segments.
+/// Parser for agent response text, extracting tool calls, code diffs, and segments.
+enum MessageParser {
     static func parse(_ text: String) -> [MessageSegment] {
         var segments: [MessageSegment] = []
         let lines = text.components(separatedBy: .newlines)
@@ -108,7 +108,7 @@ struct MessageParser {
             ("📂", "Open", "folder"),
             ("🚀", "Run", "play"),
             ("🗑", "Delete", "trash"),
-            ("🔧", "Configure", "wrench"),
+            ("🔧", "Configure", "wrench")
         ]
 
         for (emoji, action, icon) in patterns {

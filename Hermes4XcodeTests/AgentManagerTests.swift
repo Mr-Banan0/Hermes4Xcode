@@ -1,9 +1,9 @@
-import XCTest
 @testable import HermesXcode
+import XCTest
 
 final class AgentManagerTests: XCTestCase {
 
-    var manager: AgentManager!
+    private var manager: AgentManager!
 
     override func setUp() {
         super.setUp()

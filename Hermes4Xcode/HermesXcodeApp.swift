@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 @main
 struct Hermes4XcodeApp: App {
@@ -102,7 +102,7 @@ struct DragHandle: View {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    static private(set) var shared: AppDelegate!
+    private(set) static var shared: AppDelegate!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
