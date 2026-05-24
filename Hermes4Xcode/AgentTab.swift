@@ -11,10 +11,15 @@ struct AgentTab: Identifiable, Codable {
     var inputText: String
 
     // MARK: Agent Profile (specialization)
-
     var template: AgentTemplate
     var systemPrompt: String
     var permissions: AgentPermissions
+
+    // MARK: Provider / Model (per-agent override)
+    /// Model name sent to Hermes Gateway. Empty = use Gateway's default model.
+    var model: String
+    /// Provider hint for display purposes only. Gateway routes by model name.
+    var provider: String
 
     init(
         id: UUID = UUID(),
@@ -22,7 +27,9 @@ struct AgentTab: Identifiable, Codable {
         roleDescription: String = "",
         template: AgentTemplate = .custom,
         systemPrompt: String = "",
-        permissions: AgentPermissions = .all
+        permissions: AgentPermissions = .all,
+        model: String = "",
+        provider: String = ""
     ) {
         self.id = id
         self.name = name
@@ -32,6 +39,8 @@ struct AgentTab: Identifiable, Codable {
         self.template = template
         self.systemPrompt = systemPrompt
         self.permissions = permissions
+        self.model = model
+        self.provider = provider
     }
 
     /// Apply a full AgentProfile to this tab

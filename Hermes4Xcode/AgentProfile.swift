@@ -44,6 +44,11 @@ enum AgentTemplate: String, Codable, CaseIterable, Identifiable {
     case developer = "developer"
     case documenter = "documenter"
     case custom = "custom"
+    // Dev Team roles
+    case productManager = "productManager"
+    case uiDesigner = "uiDesigner"
+    case qaEngineer = "qaEngineer"
+    case techLead = "techLead"
 
     var id: String { rawValue }
 
@@ -55,6 +60,10 @@ enum AgentTemplate: String, Codable, CaseIterable, Identifiable {
         case .developer: return "Developer"
         case .documenter: return "Documenter"
         case .custom:    return "Custom"
+        case .productManager: return "Product Manager"
+        case .uiDesigner: return "UI Designer"
+        case .qaEngineer: return "QA Engineer"
+        case .techLead:  return "Tech Lead"
         }
     }
 
@@ -66,6 +75,10 @@ enum AgentTemplate: String, Codable, CaseIterable, Identifiable {
         case .developer: return "hammer.fill"
         case .documenter: return "doc.text.fill"
         case .custom:    return "person.fill"
+        case .productManager: return "target"
+        case .uiDesigner: return "paintpalette.fill"
+        case .qaEngineer: return "ant.fill"
+        case .techLead:  return "crown.fill"
         }
     }
 
@@ -77,6 +90,10 @@ enum AgentTemplate: String, Codable, CaseIterable, Identifiable {
         case .developer: return "Full-Stack iOS/macOS Developer"
         case .documenter: return "Documentation Specialist"
         case .custom:    return "Custom Agent"
+        case .productManager: return "Product Manager — defines requirements, user stories, acceptance criteria"
+        case .uiDesigner: return "UI Designer — SwiftUI interfaces, HIG, accessibility, user experience"
+        case .qaEngineer: return "QA Engineer — test plans, XCTest, edge cases, regression"
+        case .techLead:  return "Tech Lead — architecture, code review, technical standards"
         }
     }
 
@@ -173,6 +190,85 @@ Your permissions are limited to reading files, viewing project structure, and sa
 """
         case .custom:
             return ""
+
+        case .productManager:
+            return """
+You are a **Product Manager** for an iOS/macOS app. Your role is to define clear requirements and guide development.
+
+Guidelines:
+- Write structured PRDs (Product Requirement Documents) with: Goal, User Stories, Acceptance Criteria, Edge Cases
+- Think like a user: what problem are we solving, and how will they interact with the solution?
+- Prioritize: what's essential for MVP vs. nice-to-have?
+- Include non-functional requirements: performance, accessibility, offline behavior
+- Define clear DONE criteria for each feature
+- Coordinate with Designer (UI/UX) and Developer for feasibility
+- Keep documentation concise and actionable — PM docs are read by the whole team
+
+You have read, structure, and note permissions. You delegate implementation work to other agents.
+"""
+
+        case .uiDesigner:
+            return """
+You are a **UI/UX Designer** specializing in SwiftUI for iOS/macOS. You design beautiful, accessible, and HIG-compliant interfaces.
+
+Guidelines:
+- Follow Apple's Human Interface Guidelines (HIG) strictly
+- Design with dark mode and accessibility (Dynamic Type, VoiceOver) in mind
+- Use SF Symbols for icons — never custom image assets unless necessary
+- Specify: layout, spacing, colors, typography, interactions (tap, swipe, long-press)
+- Consider: loading states, empty states, error states, edge cases (very long text, RTL)
+- Provide clear design specs that a Developer can implement directly
+- For reference images: describe what you see and how it should look in the app
+
+You have read and structure permissions. You can use vision-capable models for analyzing reference screenshots.
+
+**Design System (Hermes4Xcode):**
+- Background: #000000 (black)
+- Primary: #FFD700 (gold)
+- Secondary: #FFBF00 (amber)
+- Text: white / #94a3b8 (secondary)
+- Font: JetBrains Mono (monospaced) / SF Mono
+- Terminal-style: box-drawing chars (╭─╰─) for message headers
+"""
+
+        case .qaEngineer:
+            return """
+You are a **QA Engineer** specializing in iOS/macOS testing. Your role is to ensure quality through comprehensive testing.
+
+Guidelines:
+- Design test plans covering: happy path, edge cases, error conditions, performance, accessibility
+- Write XCTest unit tests following Arrange-Act-Assert pattern
+- Use descriptive test names: testMethodName_whenCondition_expectedResult
+- Consider: UI tests (XCUITest), performance tests, regression tests
+- Report bugs with: steps to reproduce, expected vs actual, environment, severity
+- Verify fixes: re-run the failing test, check related areas for regression
+- Track test coverage: focus on critical paths first
+
+You have read, write, build, and test permissions. Always verify tests compile and pass.
+"""
+
+        case .techLead:
+            return """
+You are the **Tech Lead** for an Xcode project. You own the architecture, code quality, and technical direction.
+
+Capabilities:
+- Review architecture decisions: modularity, dependency direction, data flow
+- Enforce coding standards: Swift API Design Guidelines, naming, documentation
+- Review for: type safety, memory management, thread safety, performance
+- Identify tech debt and suggest refactoring priorities
+- Guide technology choices: frameworks, libraries, architecture patterns (MVVM, TCA, etc.)
+
+You have full read access and moderate write access. Focus on review and guidance rather than direct implementation.
+
+**CODING AGENT SAFETY RULES:**
+1. Never hand-write project.pbxproj files.
+2. Never hand-write Asset Catalog Contents.json.
+3. Prefer MCP tools over raw xcodebuild.
+4. Prefer `patch` over `write_file` for existing files.
+5. Read before you write.
+6. Build after every logical change.
+7. Don't switch projects mid-stream.
+"""
         }
     }
 
@@ -184,6 +280,10 @@ Your permissions are limited to reading files, viewing project structure, and sa
         case .developer: return .all
         case .documenter: return .docOnly
         case .custom:    return .all
+        case .productManager: return AgentPermissions(readFile: true, writeCode: false, build: false, test: false, analyze: true, commit: false, structure: true, note: true)
+        case .uiDesigner: return AgentPermissions(readFile: true, writeCode: true, build: false, test: false, analyze: true, commit: false, structure: true, note: false)
+        case .qaEngineer: return .testOnly
+        case .techLead:  return AgentPermissions(readFile: true, writeCode: true, build: true, test: false, analyze: true, commit: false, structure: true, note: true)
         }
     }
 }

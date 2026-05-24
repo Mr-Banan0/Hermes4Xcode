@@ -77,7 +77,7 @@ final class AgentPermissionsTests: XCTestCase {
 final class AgentTemplateTests: XCTestCase {
 
     func test_allCases_count() {
-        XCTAssertEqual(AgentTemplate.allCases.count, 6)
+        XCTAssertEqual(AgentTemplate.allCases.count, 10)
     }
 
     func test_ids_matchRawValues() {

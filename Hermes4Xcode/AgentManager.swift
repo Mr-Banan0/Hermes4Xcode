@@ -19,6 +19,9 @@ final class AgentManager: ObservableObject {
 
     // Tool call tracking for LiveToolCallBar
     @Published var activeToolCalls: [ToolCallInfo] = []
+    @Published var streamingPhase: StreamingPhase = .idle
+    @Published var phaseResults: [PhaseResult] = []
+
     private let toolCallPatterns: [(emoji: String, name: String, icon: String)] = [
         ("🛠", "Build", "hammer.fill"),
         ("📖", "Read", "doc.text.magnifyingglass"),
@@ -176,15 +179,18 @@ final class AgentManager: ObservableObject {
         history += tab.messages.map { ["role": $0.role, "content": $0.text] }
 
         Task {
+            let tabModel = tabs[idx].model.isEmpty ? "hermes-agent" : tabs[idx].model
             await client.sendMessage(
                 text,
                 contextCode: nil,
                 history: history,
+                model: tabModel,
                 onDelta: { delta in
                     Task { @MainActor in
                         self.streamingTexts[tabId] = (self.streamingTexts[tabId] ?? "") + delta
                         self.currentAssistantText = self.streamingTexts[tabId] ?? ""
                         self.updateToolCalls(from: self.streamingTexts[tabId] ?? "")
+                        self.updatePhase(from: self.streamingTexts[tabId] ?? "")
                     }
                 },
                 onComplete: { result in
@@ -212,6 +218,50 @@ final class AgentManager: ObservableObject {
                     }
                 },
             )
+        }
+    }
+
+    // MARK: - Phase Tracking
+
+    /// Update streaming phase based on accumulated streaming text
+    func updatePhase(from text: String) {
+        guard !text.isEmpty else {
+            streamingPhase = .thinking
+            return
+        }
+
+        let lower = text.lowercased()
+        let last100 = String(lower.suffix(100))
+
+        if last100.contains("build") || last100.contains("compil") || last100.contains("xcodebuild") {
+            streamingPhase = .building
+        } else if last100.contains("read") || last100.contains("check") || last100.contains("look") || last100.contains("open") {
+            streamingPhase = .reading
+        } else if last100.contains("plan") || last100.contains("first") || last100.contains("step") || last100.contains("will do") {
+            streamingPhase = .planning
+        } else if last100.contains("creat") || last100.contains("write") || last100.contains("implement") || last100.contains("add ") {
+            streamingPhase = .writing
+        } else if last100.contains("analyz") || last100.contains("structur") || last100.contains("architectur") || last100.contains("understand") {
+            streamingPhase = .analyzing
+        } else if last100.contains("test") || last100.contains("run") {
+            streamingPhase = .testing
+        } else if last100.contains("search") || last100.contains("find") || last100.contains("locate") {
+            streamingPhase = .searching
+        } else {
+            streamingPhase = .responding
+        }
+    }
+
+    /// Add a structured result to the phase results list
+    func addPhaseResult(icon: String, title: String, detail: String, status: PhaseResultStatus) {
+        let result = PhaseResult(icon: icon, title: title, detail: detail, status: status)
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                self.phaseResults.append(result)
+                if self.phaseResults.count > 5 {
+                    self.phaseResults.removeFirst()
+                }
+            }
         }
     }
 

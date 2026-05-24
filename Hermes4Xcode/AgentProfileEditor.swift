@@ -12,6 +12,8 @@ struct AgentProfileEditor: View {
     @State private var permissions: AgentPermissions = .all
     @State private var template: AgentTemplate = .custom
     @State private var selectedTab = 0
+    @State private var model: String = ""
+    @State private var provider: String = ""
 
     init(manager: AgentManager, tabId: UUID) {
         self.manager = manager
@@ -22,6 +24,8 @@ struct AgentProfileEditor: View {
         _systemPrompt = State(initialValue: tab.systemPrompt)
         _permissions = State(initialValue: tab.permissions)
         _template = State(initialValue: tab.template)
+        _model = State(initialValue: tab.model)
+        _provider = State(initialValue: tab.provider)
     }
 
     var body: some View {
@@ -50,6 +54,7 @@ struct AgentProfileEditor: View {
                 Text("Profile").tag(0)
                 Text("Prompt").tag(1)
                 Text("Permissions").tag(2)
+                Text("Model").tag(3)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -62,6 +67,7 @@ struct AgentProfileEditor: View {
                 case 0: profileTab
                 case 1: promptTab
                 case 2: permissionsTab
+                case 3: modelTab
                 default: EmptyView()
                 }
             }
@@ -255,6 +261,57 @@ struct AgentProfileEditor: View {
         .padding(16)
     }
 
+    // MARK: - Model Tab
+
+    private var modelTab: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            fieldLabel("Model (Gateway Routing)")
+            Text("Leave empty to use the Gateway's default model. Enter a model name to route this agent's requests to a specific model.")
+                .font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary)
+
+            Divider().background(Color.hermes.opacity(0.2))
+
+            fieldLabel("Model Name")
+            HermesField(text: $model, placeholder: "e.g. deepseek-v4-flash, claude-sonnet-4, gpt-4o")
+                .help("Model name sent to Hermes Gateway API")
+
+            fieldLabel("Provider (display only)")
+            Picker("", selection: $provider) {
+                Text("Default").tag("")
+                ForEach(AvailableProviders, id: \.name) { p in
+                    Text(p.name).tag(p.name)
+                }
+            }
+            .pickerStyle(.menu)
+            .font(.system(size: 11, design: .monospaced))
+
+            if !provider.isEmpty, let p = AvailableProviders.first(where: { $0.name == provider }) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Default model: \(p.defaultModel)")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    Text("URL: \(p.defaultURL)")
+                        .font(.system(size: 8, design: .monospaced))
+                        .foregroundColor(.gray)
+                }
+                .padding(8)
+                .background(Color(white: 0.08)).cornerRadius(6)
+            }
+
+            if !model.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "info.circle.fill").font(.caption2).foregroundColor(.hermes)
+                    Text("The Gateway must have this model provider configured. See Provider Settings.")
+                        .font(.system(size: 8, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(16)
+    }
+
     // MARK: - Helpers
 
     private func fieldLabel(_ text: String) -> some View {
@@ -289,15 +346,12 @@ struct AgentProfileEditor: View {
     }
 
     private func saveAndClose() {
-        let profile = AgentProfile(
-            id: tabId,
-            name: name,
-            template: template,
-            role: role,
-            systemPrompt: systemPrompt,
-            permissions: permissions
-        )
-        manager.updateProfile(for: tabId, profile)
+        var profile = AgentProfile(name: name, template: template, role: role, systemPrompt: systemPrompt, permissions: permissions)
+        if let idx = manager.tabs.firstIndex(where: { $0.id == tabId }) {
+            manager.tabs[idx].applyProfile(profile)
+            manager.tabs[idx].model = model
+            manager.tabs[idx].provider = provider
+        }
         manager.showProfileEditor = false
     }
 }

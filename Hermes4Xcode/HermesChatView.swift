@@ -65,6 +65,29 @@ struct HermesChatView: View {
                 isStreaming: manager.isStreaming
             )
 
+            // Phase Status Pill (compact phase indicator)
+            if manager.streamingPhase != .idle {
+                HStack {
+                    PhaseStatusPill(
+                        phase: manager.streamingPhase,
+                        isStreaming: manager.isStreaming
+                    )
+                    Spacer()
+                }
+                .padding(.horizontal, 10).padding(.vertical, 2)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            // Phase Result Boxes (from completed phases)
+            if !manager.phaseResults.isEmpty {
+                VStack(spacing: 2) {
+                    ForEach(manager.phaseResults) { result in
+                        PhaseResultBox(result: result)
+                    }
+                }
+                .padding(.horizontal, 10).padding(.vertical, 2)
+            }
+
             // Messages
             ScrollViewReader { proxy in
                 ScrollView {

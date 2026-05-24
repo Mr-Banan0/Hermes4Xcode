@@ -7,6 +7,7 @@ actor HermesAPIClient {
         _ text: String,
         contextCode: String? = nil,
         history: [[String: String]] = [],
+        model: String = "hermes-agent",
         onDelta: @escaping @Sendable (String) -> Void,
         onComplete: @escaping @Sendable (Result<String, Error>) -> Void
     ) {
@@ -22,7 +23,7 @@ actor HermesAPIClient {
         messages.append(["role": "user", "content": text])
 
         let body: [String: Any] = [
-            "model": "hermes-agent",
+            "model": model,
             "messages": messages,
             "stream": true
         ]
