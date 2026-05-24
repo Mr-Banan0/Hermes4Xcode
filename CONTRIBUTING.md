@@ -31,7 +31,7 @@ Then press `Cmd+R` in Xcode.
 
 ### Code Style
 
-- Follow [Swift API Design Guidelines](https://www.swift.org/documentation/api-design-guidelines/)
+- Follow the [Hermes4Xcode Coding Standards](CODING_STANDARDS.md) for Swift style, architecture, and patterns.
 - Use 4-space indentation (enforced by SwiftLint)
 - Write documentation comments (`///`) for all public types and methods
 - Use `MARK:` comments to organize sections within files
