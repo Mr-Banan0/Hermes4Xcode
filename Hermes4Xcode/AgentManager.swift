@@ -161,6 +161,11 @@ final class AgentManager: ObservableObject {
         streamingTexts[tabId] = ""
         isStreaming = true
 
+        // Ensure a fresh conversation ID for new conversations
+        if ConversationStore.shared.currentConversationId == nil {
+            ConversationStore.shared.currentConversationId = UUID()
+        }
+
         // Build history with system prompt prefix
         let tab = tabs[idx]
         var history = [[String: String]]()
@@ -203,6 +208,7 @@ final class AgentManager: ObservableObject {
                             self.appendMessage(StoredMessage(role: "assistant", text: full), to: tabId)
                             self.checkForAgentCreation(full)
                             self.checkForDelegation(full)
+                            self.detectAndNameConversation(from: full, userText: text)
                         case .failure(let err):
                             self.appendMessage(StoredMessage(role: "assistant", text: "Error: \(err.localizedDescription)"), to: tabId)
                         }
@@ -289,39 +295,44 @@ final class AgentManager: ObservableObject {
         autoSave()
     }
 
-    /// Check if the assistant response contains delegation patterns and auto-route
+    /// Check if the assistant response contains explicit delegation patterns and auto-route.
+    /// Only triggers on explicit patterns like `@existingAgent:` or `[delegate to agent]`.
+    /// Does NOT auto-create tabs — only routes to existing ones.
     func checkForDelegation(_ response: String) {
-        let patterns = [
-            ("@", ":"),
-            ("[delegate to ", "]"),
-            ("[route to ", "]"),
-            ("[send to ", "]"),
-            ("pass this to ", " "),
-        ]
+        // Only match explicit bracket patterns — @ mentions must match existing tabs
         let lower = response.lowercased()
-        for (prefix, suffix) in patterns {
-            if lower.contains(prefix) {
-                // Extract agent name
-                if let range = lower.range(of: prefix) {
-                    let rest = lower[range.upperBound...].trimmingCharacters(in: .whitespaces)
-                    let name = rest.split(whereSeparator: { $0 == " " || $0 == "." || $0 == "," || $0 == "\n" || $0 == ":" || $0 == "]" }).first.map(String.init) ?? ""
-                    if !name.isEmpty, name != "supervisor" {
-                        // Find or create tab
-                        if let existing = tabs.first(where: { $0.name.lowercased() == name }) {
-                            let msg = StoredMessage(role: "user", text: "[Delegated from \(tabs.first(where: { $0.id == activeTabId })?.name ?? "unknown")] \(response)")
-                            tabs[tabs.firstIndex(where: { $0.id == existing.id })!].messages.append(msg)
-                            activeTabId = existing.id
-                        } else {
-                            // Auto-create the tab
-                            let newId = createTab(name: name)
-                            let msg = StoredMessage(role: "user", text: "[Delegated from \(tabs.first(where: { $0.id == activeTabId })?.name ?? "unknown")] \(response)")
-                            if let idx = tabs.firstIndex(where: { $0.id == newId }) {
-                                tabs[idx].messages.append(msg)
-                            }
-                        }
-                        return
+
+        // Pattern 1: [delegate to name] / [route to name] / [send to name]
+        let bracketPatterns = ["[delegate to ", "[route to ", "[send to "]
+        for prefix in bracketPatterns {
+            if let range = lower.range(of: prefix) {
+                let rest = lower[range.upperBound...].trimmingCharacters(in: .whitespaces)
+                let name = rest.split(whereSeparator: { $0 == " " || $0 == "." || $0 == "]" }).first.map(String.init) ?? ""
+                if let existing = tabs.first(where: { $0.name.lowercased() == name }), existing.id != activeTabId {
+                    let sourceName = tabs.first(where: { $0.id == activeTabId })?.name ?? "unknown"
+                    let msg = StoredMessage(role: "user", text: "[Delegated from \(sourceName)] \(response)")
+                    if let idx = tabs.firstIndex(where: { $0.id == existing.id }) {
+                        tabs[idx].messages.append(msg)
                     }
+                    activeTabId = existing.id
+                    autoSave()
+                    return
                 }
+            }
+        }
+
+        // Pattern 2: @existingAgentName: — only routes to tabs that already exist
+        for tab in tabs where tab.id != activeTabId {
+            let mention = "@\(tab.name.lowercased()):"
+            if lower.contains(mention) {
+                let sourceName = tabs.first(where: { $0.id == activeTabId })?.name ?? "unknown"
+                let msg = StoredMessage(role: "user", text: "[Delegated from \(sourceName)] \(response)")
+                if let idx = tabs.firstIndex(where: { $0.id == tab.id }) {
+                    tabs[idx].messages.append(msg)
+                }
+                activeTabId = tab.id
+                autoSave()
+                return
             }
         }
     }
@@ -374,6 +385,54 @@ final class AgentManager: ObservableObject {
         withAnimation(.easeInOut(duration: 0.2)) {
             activeToolCalls = updated
         }
+    }
+
+    // MARK: - Conversation Naming
+
+    /// Detect the app/project name from conversation and auto-name the conversation.
+    /// Only runs once — skips if conversation already has a non-default title.
+    var hasNamedConversation = false
+
+    func detectAndNameConversation(from response: String, userText: String) {
+        guard !hasNamedConversation else { return }
+        // Check if current title is still the default date-based title
+        let store = ConversationStore.shared
+        let currentTitle = store.summaries.first(where: { $0.id == store.currentConversationId })?.title ?? ""
+
+        // Patterns in user message: "build/create/develop an/the X app"
+        let patterns = [
+            "(?:build|create|develop|make|start|work\\s+on)\\s+(?:a|an|the|my|new)?\\s*(\\w+(?:\\s+\\w+)?)\\s*(?:app|project|application)",
+            "(?:app|project)\\s+(?:called|named)\\s+(\\w+)",
+        ]
+
+        let combined = "\(userText.lowercased()) \(response.lowercased())"
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: []),
+               let match = regex.firstMatch(in: combined, range: NSRange(combined.startIndex..., in: combined)),
+               match.range(at: 1).location != NSNotFound {
+                let name = String(combined[Range(match.range(at: 1), in: combined)!])
+                    .trimmingCharacters(in: .whitespaces)
+                    .capitalized
+                if !name.isEmpty, name.count < 40 {
+                    updateConversationTitle(name)
+                    hasNamedConversation = true
+                    return
+                }
+            }
+        }
+    }
+
+    private func updateConversationTitle(_ title: String) {
+        let store = ConversationStore.shared
+        guard let convId = store.currentConversationId else { return }
+        // Update the saved file
+        if var conv = store.load(id: convId) {
+            conv.title = title
+            conv.updatedAt = Date()
+            store.save(conversation: conv)
+        }
+        // Refresh sidebar
+        Task { @MainActor in await store.refreshSummaries() }
     }
 
     // MARK: - Agent Self-Creation

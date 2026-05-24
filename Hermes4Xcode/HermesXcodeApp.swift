@@ -62,13 +62,9 @@ struct Hermes4XcodeApp: App {
             .background(Color.black)
             .animation(.easeInOut(duration: animDuration), value: isSidebarCollapsed)
             .onAppear {
-                // Load last conversation
+                // Refresh sidebar conversation list, but start fresh
                 Task { @MainActor in
                     await ConversationStore.shared.refreshSummaries()
-                    if let last = ConversationStore.shared.summaries.first,
-                       let conv = ConversationStore.shared.load(id: last.id) {
-                        agentManager.restore(from: conv)
-                    }
                 }
                 DispatchQueue.global().async {
                     if SourceKitLSPClient.shared.start() {

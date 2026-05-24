@@ -129,12 +129,14 @@ struct SidebarView: View {
     private func loadConversation(_ id: UUID) {
         guard let conv = store.load(id: id) else { return }
         agentManager.restore(from: conv)
+        agentManager.hasNamedConversation = true  // Already named, skip auto-naming
         selectedPage = .chat
     }
 
     private func newConversation() {
         agentManager.tabs = []
         agentManager.activeTabId = UUID()
+        agentManager.hasNamedConversation = false
         // Re-init with fresh supervisor tab
         let welcome = StoredMessage(role: "assistant", text: AgentManager.welcomeText + "\n\nLet's create our app！")
         var defaultTab = AgentTab(id: UUID(), name: "supervisor", template: .supervisor)
