@@ -25,6 +25,9 @@ jobs:
       - name: Show Xcode Version
         run: xcodebuild -version
 
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
       - name: SwiftLint
         run: swiftlint --strict
 
