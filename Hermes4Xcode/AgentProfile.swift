@@ -39,8 +39,6 @@ struct AgentPermissions: Codable, Equatable {
 /// 内置 agent 角色模板
 enum AgentTemplate: String, Codable, CaseIterable, Identifiable {
     case supervisor = "supervisor"
-    case reviewer = "reviewer"
-    case tester = "tester"
     case developer = "developer"
     case documenter = "documenter"
     case custom = "custom"
@@ -55,8 +53,6 @@ enum AgentTemplate: String, Codable, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .supervisor: return "Supervisor"
-        case .reviewer:  return "Code Reviewer"
-        case .tester:    return "Test Engineer"
         case .developer: return "Developer"
         case .documenter: return "Documenter"
         case .custom:    return "Custom"
@@ -70,8 +66,6 @@ enum AgentTemplate: String, Codable, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .supervisor: return "star.fill"
-        case .reviewer:  return "eye.fill"
-        case .tester:    return "checkmark.seal.fill"
         case .developer: return "hammer.fill"
         case .documenter: return "doc.text.fill"
         case .custom:    return "person.fill"
@@ -85,8 +79,6 @@ enum AgentTemplate: String, Codable, CaseIterable, Identifiable {
     var defaultRole: String {
         switch self {
         case .supervisor: return "Supervisor — orchestrates all development tasks"
-        case .reviewer:  return "Code Review Specialist"
-        case .tester:    return "Testing & QA Specialist"
         case .developer: return "Full-Stack iOS/macOS Developer"
         case .documenter: return "Documentation Specialist"
         case .custom:    return "Custom Agent"
@@ -121,34 +113,6 @@ You have full access to all tools. Coordinate with the user to determine the bes
 5. Read a file's current content before modifying it. Never edit blind.
 6. Build after every logical change. Only move on when BUILD SUCCEEDED.
 7. Do NOT switch projects mid-stream. Finish current work or commit/stash before context switching.
-"""
-        case .reviewer:
-            return """
-You are a **Code Review Specialist**. Your primary focus is code quality, correctness, and maintainability.
-
-Guidelines:
-- Review code for bugs, edge cases, and logic errors
-- Check Swift style and conventions (API Design Guidelines)
-- Identify performance issues and suggest optimizations
-- Look for type safety, memory management, and thread safety concerns
-- Be constructive: explain WHY something should change, not just WHAT
-- Provide concrete code examples for suggested improvements
-
-Your permissions are limited to reading files, analyzing code, and viewing project structure. You cannot build, test, or write code directly — focus on thorough analysis.
-"""
-        case .tester:
-            return """
-You are a **Testing & QA Specialist**. Your primary focus is ensuring code quality through comprehensive testing.
-
-Guidelines:
-- Write thorough XCTest unit tests covering happy paths, edge cases, and error conditions
-- Follow the Arrange-Act-Assert pattern
-- Use descriptive test method names (testMethodName_whenCondition_expectedResult)
-- Add integration tests when appropriate
-- Verify tests compile and pass before finishing
-- Suggest test targets and test plans as needed
-
-You have build and test permissions. Always verify that new tests actually run before declaring success.
 """
         case .developer:
             return """
@@ -275,8 +239,6 @@ You have full read access and moderate write access. Focus on review and guidanc
     var defaultPermissions: AgentPermissions {
         switch self {
         case .supervisor: return .all
-        case .reviewer:  return .readOnly
-        case .tester:    return .testOnly
         case .developer: return .all
         case .documenter: return .docOnly
         case .custom:    return .all
@@ -301,7 +263,7 @@ struct AgentProfile: Codable, Identifiable {
     init(
         id: UUID = UUID(),
         name: String,
-        template: AgentTemplate,
+        template: AgentTemplate = .custom,
         role: String? = nil,
         systemPrompt: String? = nil,
         permissions: AgentPermissions? = nil

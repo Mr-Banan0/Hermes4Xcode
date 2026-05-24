@@ -77,7 +77,7 @@ final class AgentPermissionsTests: XCTestCase {
 final class AgentTemplateTests: XCTestCase {
 
     func test_allCases_count() {
-        XCTAssertEqual(AgentTemplate.allCases.count, 10)
+        XCTAssertEqual(AgentTemplate.allCases.count, 8)
     }
 
     func test_ids_matchRawValues() {
@@ -94,12 +94,19 @@ final class AgentTemplateTests: XCTestCase {
         XCTAssertTrue(t.defaultPermissions == .all)
     }
 
-    func test_reviewer_defaultPermissions_readOnly() {
-        XCTAssertEqual(AgentTemplate.reviewer.defaultPermissions, .readOnly)
+    func test_techLead_defaultPermissions() {
+        XCTAssertEqual(AgentTemplate.techLead.defaultPermissions.readFile, true)
+        XCTAssertEqual(AgentTemplate.techLead.defaultPermissions.writeCode, true)
+        XCTAssertEqual(AgentTemplate.techLead.defaultPermissions.build, true)
+        XCTAssertEqual(AgentTemplate.techLead.defaultPermissions.test, false)
+        XCTAssertEqual(AgentTemplate.techLead.defaultPermissions.analyze, true)
+        XCTAssertEqual(AgentTemplate.techLead.defaultPermissions.commit, false)
+        XCTAssertEqual(AgentTemplate.techLead.defaultPermissions.structure, true)
+        XCTAssertEqual(AgentTemplate.techLead.defaultPermissions.note, true)
     }
 
-    func test_tester_defaultPermissions_testOnly() {
-        XCTAssertEqual(AgentTemplate.tester.defaultPermissions, .testOnly)
+    func test_qaEngineer_defaultPermissions_testOnly() {
+        XCTAssertEqual(AgentTemplate.qaEngineer.defaultPermissions, .testOnly)
     }
 
     func test_documenter_defaultPermissions_docOnly() {
@@ -127,16 +134,18 @@ final class AgentTemplateTests: XCTestCase {
         XCTAssertTrue(prompt.contains("SourceKit-LSP"))
     }
 
-    func test_reviewer_defaultPrompt_containsGuidelines() {
-        let prompt = AgentTemplate.reviewer.defaultPrompt
-        XCTAssertTrue(prompt.contains("Code Review Specialist"))
-        XCTAssertTrue(prompt.contains("bugs"))
-        XCTAssertTrue(prompt.contains("WHY"))
+    func test_techLead_defaultPrompt_containsGuidelines() {
+        let prompt = AgentTemplate.techLead.defaultPrompt
+        XCTAssertTrue(prompt.contains("Tech Lead"))
+        XCTAssertTrue(prompt.contains("architecture"))
+        XCTAssertTrue(prompt.contains("code quality"))
+        XCTAssertTrue(prompt.contains("Swift API Design Guidelines"))
     }
 
-    func test_tester_defaultPrompt_containsTestingGuidelines() {
-        let prompt = AgentTemplate.tester.defaultPrompt
-        XCTAssertTrue(prompt.contains("Testing & QA Specialist"))
+    func test_qaEngineer_defaultPrompt_containsTestingGuidelines() {
+        let prompt = AgentTemplate.qaEngineer.defaultPrompt
+        XCTAssertTrue(prompt.contains("QA Engineer"))
+        XCTAssertTrue(prompt.contains("XCTest"))
         XCTAssertTrue(prompt.contains("Arrange-Act-Assert"))
     }
 
@@ -158,12 +167,12 @@ final class AgentTemplateTests: XCTestCase {
 final class AgentProfileTests: XCTestCase {
 
     func test_profile_init_withDefaults() {
-        let profile = AgentProfile(name: "TestAgent", template: .tester)
+        let profile = AgentProfile(name: "TestAgent", template: .qaEngineer)
         XCTAssertEqual(profile.name, "TestAgent")
-        XCTAssertEqual(profile.template, .tester)
-        XCTAssertEqual(profile.role, AgentTemplate.tester.defaultRole)
-        XCTAssertEqual(profile.systemPrompt, AgentTemplate.tester.defaultPrompt)
-        XCTAssertEqual(profile.permissions, AgentTemplate.tester.defaultPermissions)
+        XCTAssertEqual(profile.template, .qaEngineer)
+        XCTAssertEqual(profile.role, AgentTemplate.qaEngineer.defaultRole)
+        XCTAssertEqual(profile.systemPrompt, AgentTemplate.qaEngineer.defaultPrompt)
+        XCTAssertEqual(profile.permissions, AgentTemplate.qaEngineer.defaultPermissions)
     }
 
     func test_profile_init_withOverrides() {
@@ -184,15 +193,15 @@ final class AgentProfileTests: XCTestCase {
     func test_profile_resetToTemplate_restoresDefaults() {
         var profile = AgentProfile(
             name: "Modified",
-            template: .reviewer,
+            template: .techLead,
             role: "Changed Role",
             systemPrompt: "Changed Prompt",
             permissions: .all
         )
         profile.resetToTemplate()
-        XCTAssertEqual(profile.role, AgentTemplate.reviewer.defaultRole)
-        XCTAssertEqual(profile.systemPrompt, AgentTemplate.reviewer.defaultPrompt)
-        XCTAssertEqual(profile.permissions, AgentTemplate.reviewer.defaultPermissions)
+        XCTAssertEqual(profile.role, AgentTemplate.techLead.defaultRole)
+        XCTAssertEqual(profile.systemPrompt, AgentTemplate.techLead.defaultPrompt)
+        XCTAssertEqual(profile.permissions, AgentTemplate.techLead.defaultPermissions)
         // Name should NOT be reset
         XCTAssertEqual(profile.name, "Modified")
     }

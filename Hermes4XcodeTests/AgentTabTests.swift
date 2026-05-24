@@ -19,30 +19,30 @@ final class AgentTabTests: XCTestCase {
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
             name: "CustomTab",
             roleDescription: "Custom role",
-            template: .reviewer,
+            template: .techLead,
             systemPrompt: "Custom system prompt",
-            permissions: .readOnly
+            permissions: .all
         )
         XCTAssertEqual(tab.id.uuidString, "00000000-0000-0000-0000-000000000001")
         XCTAssertEqual(tab.name, "CustomTab")
         XCTAssertEqual(tab.roleDescription, "Custom role")
-        XCTAssertEqual(tab.template, .reviewer)
+        XCTAssertEqual(tab.template, .techLead)
         XCTAssertEqual(tab.systemPrompt, "Custom system prompt")
-        XCTAssertEqual(tab.permissions, .readOnly)
+        XCTAssertEqual(tab.permissions, .all)
     }
 
     func test_tab_applyProfile_updatesAllFields() {
         var tab = AgentTab(name: "OldName")
         let profile = AgentProfile(
             name: "NewName",
-            template: .tester,
+            template: .qaEngineer,
             role: "New role",
             systemPrompt: "New prompt",
             permissions: .testOnly
         )
         tab.applyProfile(profile)
         XCTAssertEqual(tab.name, "NewName")
-        XCTAssertEqual(tab.template, .tester)
+        XCTAssertEqual(tab.template, .qaEngineer)
         XCTAssertEqual(tab.roleDescription, "New role")
         XCTAssertEqual(tab.systemPrompt, "New prompt")
         XCTAssertEqual(tab.permissions, .testOnly)
