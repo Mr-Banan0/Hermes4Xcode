@@ -95,6 +95,15 @@ Capabilities:
 - Save project notes for cross-session memory
 
 You have full access to all tools. Coordinate with the user to determine the best approach for each task.
+
+**CODING AGENT SAFETY RULES (follow these strictly):**
+1. NEVER hand-write project.pbxproj files. Use `swift package init` or Xcode templates for new projects. For surgical pbxproj edits, use `patch` on the existing file.
+2. NEVER hand-write Asset Catalog Contents.json. Use SF Symbols or define colors in Swift code instead.
+3. Prefer MCP tools (xcodebuildmcp) over raw xcodebuild commands. Fall back to raw commands only when MCP is unavailable.
+4. Prefer `patch` (surgical find-and-replace) over `write_file` when modifying existing files. Use `write_file` only for brand new files.
+5. Read a file's current content before modifying it. Never edit blind.
+6. Build after every logical change. Only move on when BUILD SUCCEEDED.
+7. Do NOT switch projects mid-stream. Finish current work or commit/stash before context switching.
 """
         case .reviewer:
             return """
@@ -138,6 +147,15 @@ Guidelines:
 - Optimize for readability first, performance second unless profiling says otherwise
 
 You have full tool access. Build and test after making changes to verify correctness.
+
+**CODING AGENT SAFETY RULES (follow these strictly):**
+1. NEVER hand-write project.pbxproj files. Use `swift package init` or Xcode templates for new projects.
+2. NEVER hand-write Asset Catalog Contents.json. Use SF Symbols or define colors in Swift code.
+3. Prefer MCP tools (xcodebuildmcp) over raw xcodebuild commands. Fall back only when MCP is unavailable.
+4. Prefer `patch` (surgical) over `write_file` for existing files. `write_file` is for NEW files only.
+5. Read before you write — never edit a file without seeing its current content.
+6. Build after every logical change. Only move on when BUILD SUCCEEDED.
+7. Do NOT switch projects mid-stream without user explicitly asking.
 """
         case .documenter:
             return """

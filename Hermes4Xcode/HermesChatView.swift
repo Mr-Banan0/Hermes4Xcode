@@ -74,12 +74,17 @@ struct HermesChatView: View {
                         }
                         if manager.streamingTabs.contains(activeTab.id) {
                             let streamText = manager.streamingTexts[activeTab.id] ?? ""
-                            let streamMsg = StructuredMessage(
-                                role: "assistant",
-                                segments: MessageParser.parse(streamText + "\u{258C}"),
-                                rawText: streamText + "\u{258C}"
-                            )
-                            TerminalMessageView(msg: streamMsg).id("cursor")
+                            if streamText.isEmpty {
+                                // Backend is processing — show Thinking indicator
+                                ThinkingIndicator().id("cursor")
+                            } else {
+                                let streamMsg = StructuredMessage(
+                                    role: "assistant",
+                                    segments: MessageParser.parse(streamText + "\u{258C}"),
+                                    rawText: streamText + "\u{258C}"
+                                )
+                                TerminalMessageView(msg: streamMsg).id("cursor")
+                            }
                         }
                     }
                     .padding(.horizontal, 8).padding(.vertical, 8).id("bottom")
@@ -745,5 +750,32 @@ struct GatewayStatusDot: View {
                 checking = false; isReachable = (resp as? HTTPURLResponse)?.statusCode == 200 && err == nil
             }
         }.resume()
+    }
+}
+
+// MARK: - Thinking Indicator
+
+/// Pulsing "Thinking..." animation shown while backend processes but hasn't returned text yet.
+struct ThinkingIndicator: View {
+    @State private var phase = 0
+    private let dots = ["", ".", "..", "...", "..", "."]
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(Color.hermes)
+                .frame(width: 8, height: 8)
+                .opacity(phase == 0 ? 1 : 0.3)
+                .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: phase)
+            Text("Thinking\(dots[phase])")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(.hermes.opacity(0.8))
+        }
+        .padding(.leading, 14).padding(.vertical, 8)
+        .onAppear {
+            Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+                phase = (phase + 1) % dots.count
+            }
+        }
     }
 }
