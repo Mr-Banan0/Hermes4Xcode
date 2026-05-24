@@ -43,22 +43,28 @@ struct BuildSummary: Equatable {
 enum BuildLogParser {
 
     /// Regex: /path/file.swift:LINE:COL: error/warning/note: message
-    private static let linePattern = try! NSRegularExpression(
-        pattern: #"^(.+?):(\d+):(?::(\d+):)?\s*(error|warning|note):\s*(.+)"#,
-        options: []
-    )
+    private static let linePattern: NSRegularExpression? = {
+        try? NSRegularExpression(
+            pattern: #"^(.+?):(\d+):(?::(\d+):)?\s*(error|warning|note):\s*(.+)"#,
+            options: []
+        )
+    }()
 
     /// Regex: BUILD SUCCEEDED or BUILD FAILED
-    private static let statusPattern = try! NSRegularExpression(
-        pattern: #"(BUILD|TEST)\s+(SUCCEEDED|FAILED)"#,
-        options: []
-    )
+    private static let statusPattern: NSRegularExpression? = {
+        try? NSRegularExpression(
+            pattern: #"(BUILD|TEST)\s+(SUCCEEDED|FAILED)"#,
+            options: []
+        )
+    }()
 
     // Regex: Testing started / passed / failed
-    private static let testPattern = try! NSRegularExpression(
-        pattern: #"(Test\s+(passed|failed)|Testing\s+started|\d+ tests?)"#,
-        options: [.caseInsensitive]
-    )
+    private static let testPattern: NSRegularExpression? = {
+        try? NSRegularExpression(
+            pattern: #"(Test\s+(passed|failed)|Testing\s+started|\d+ tests?)"#,
+            options: [.caseInsensitive]
+        )
+    }()
 
     static func parse(_ text: String) -> [BuildLogEntry] {
         var entries: [BuildLogEntry] = []
@@ -125,6 +131,7 @@ enum BuildLogParser {
     // MARK: - Private Parsers
 
     private static func parseLineEntry(_ line: String) -> BuildLogEntry? {
+        guard let linePattern else { return nil }
         guard let match = linePattern.firstMatch(
             in: line, range: NSRange(line.startIndex..., in: line)
         ) else { return nil }
@@ -151,6 +158,7 @@ enum BuildLogParser {
     }
 
     private static func parseStatusEntry(_ line: String) -> BuildLogEntry? {
+        guard let statusPattern else { return nil }
         guard let _ = statusPattern.firstMatch(
             in: line, range: NSRange(line.startIndex..., in: line)
         ) else { return nil }
@@ -162,6 +170,7 @@ enum BuildLogParser {
     }
 
     private static func parseTestEntry(_ line: String) -> BuildLogEntry? {
+        guard let testPattern else { return nil }
         guard let _ = testPattern.firstMatch(
             in: line, range: NSRange(line.startIndex..., in: line)
         ) else { return nil }

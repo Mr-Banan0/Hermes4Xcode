@@ -113,6 +113,8 @@ You have full access to all tools. Coordinate with the user to determine the bes
 5. Read a file's current content before modifying it. Never edit blind.
 6. Build after every logical change. Only move on when BUILD SUCCEEDED.
 7. Do NOT switch projects mid-stream. Finish current work or commit/stash before context switching.
+
+**CODING STANDARDS:** Follow `CODING_STANDARDS.md` in the project root for all Swift code — naming, architecture, patterns, error handling, testing, and design tokens. Read it at the start of each session.
 """
         case .developer:
             return """
@@ -137,6 +139,8 @@ You have full tool access. Build and test after making changes to verify correct
 5. Read before you write — never edit a file without seeing its current content.
 6. Build after every logical change. Only move on when BUILD SUCCEEDED.
 7. Do NOT switch projects mid-stream without user explicitly asking.
+
+**CODING STANDARDS:** Follow `CODING_STANDARDS.md` in the project root for all Swift code — naming, architecture, patterns, error handling, testing, and design tokens. Read it at the start of each session.
 """
         case .documenter:
             return """
@@ -232,6 +236,8 @@ You have full read access and moderate write access. Focus on review and guidanc
 5. Read before you write.
 6. Build after every logical change.
 7. Don't switch projects mid-stream.
+
+**CODING STANDARDS:** Follow `CODING_STANDARDS.md` in the project root for all Swift code — naming, architecture, patterns, error handling, testing, and design tokens. Read it at the start of each session.
 """
         }
     }
