@@ -32,7 +32,8 @@ struct Hermes4XcodeApp: App {
                         withAnimation(.easeInOut(duration: animDuration)) {
                             isSidebarCollapsed.toggle()
                         }
-                    }
+                    },
+                    agentManager: agentManager
                 )
                 .frame(width: currentSidebarWidth)
                 .animation(.easeInOut(duration: animDuration), value: isSidebarCollapsed)
@@ -61,6 +62,14 @@ struct Hermes4XcodeApp: App {
             .background(Color.black)
             .animation(.easeInOut(duration: animDuration), value: isSidebarCollapsed)
             .onAppear {
+                // Load last conversation
+                Task { @MainActor in
+                    await ConversationStore.shared.refreshSummaries()
+                    if let last = ConversationStore.shared.summaries.first,
+                       let conv = ConversationStore.shared.load(id: last.id) {
+                        agentManager.restore(from: conv)
+                    }
+                }
                 DispatchQueue.global().async {
                     if SourceKitLSPClient.shared.start() {
                         NSLog("[Hermes4Xcode] SourceKit-LSP started")
@@ -125,6 +134,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 window.setFrame(NSRect(x: x, y: y, width: w, height: h), display: true)
             }
         }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        NSLog("[Hermes4Xcode] Application terminating")
     }
 
     func runAppleScript(_ script: String) -> String? {

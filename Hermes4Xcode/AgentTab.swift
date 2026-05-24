@@ -82,11 +82,16 @@ struct StoredMessage: Identifiable, Codable {
     let id: UUID
     let role: String
     let text: String
+    var sourceTabId: UUID?           // nil = original, set = forwarded
+    var forwardedFromName: String?   // snapshot of source tab name (survives renames)
 
-    init(id: UUID = UUID(), role: String, text: String) {
+    init(id: UUID = UUID(), role: String, text: String,
+         sourceTabId: UUID? = nil, forwardedFromName: String? = nil) {
         self.id = id
         self.role = role
         self.text = text
+        self.sourceTabId = sourceTabId
+        self.forwardedFromName = forwardedFromName
     }
 }
 

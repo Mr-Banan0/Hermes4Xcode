@@ -59,12 +59,18 @@ struct HermesChatView: View {
 
             Divider().background(Color.hermes.opacity(0.3))
 
+            // Tool Call Visualizer
+            LiveToolCallBar(
+                toolCalls: manager.activeToolCalls,
+                isStreaming: manager.isStreaming
+            )
+
             // Messages
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 10) {
                         ForEach(messages) { msg in
-                            TerminalMessageView(msg: msg.asStructured)
+                            TerminalMessageView(msg: msg.asStructured, manager: manager)
                         }
                         if manager.streamingTabs.contains(activeTab.id) {
                             let streamText = manager.streamingTexts[activeTab.id] ?? ""
@@ -309,6 +315,14 @@ extension HermesChatView: XcodeBuildDelegate {
 
 struct TerminalMessageView: View {
     let msg: StructuredMessage
+    let manager: AgentManager?
+
+    init(msg: StructuredMessage, manager: AgentManager? = nil) {
+        self.msg = msg
+        self.manager = manager
+    }
+
+    @State private var showForwardPicker = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -327,12 +341,34 @@ struct TerminalMessageView: View {
                             .background(Color(white: 0.15))
                             .cornerRadius(8)
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.hermesAmber.opacity(0.3), lineWidth: 1))
+                            .contextMenu {
+                                if let mgr = manager, !mgr.eligibleForwardTargets.isEmpty {
+                                    Button("Forward to Agent...") { showForwardPicker = true }
+                                }
+                                Button("Copy") {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(msg.rawText, forType: .string)
+                                }
+                            }
                     }
                     .frame(maxWidth: 380, alignment: .trailing)
+                }
+                .sheet(isPresented: $showForwardPicker) {
+                    AgentForwardPicker(
+                        manager: manager,
+                        message: StoredMessage(role: msg.role, text: msg.rawText)
+                    )
                 }
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 0) {
+                        // Forwarded from badge
+                        if let storedMsg = msg as? StoredMessage, let fromName = storedMsg.forwardedFromName {
+                            Text("\u{21B3} from \(fromName)")
+                                .font(.system(size: 8, design: .monospaced))
+                                .foregroundColor(.hermes.opacity(0.6))
+                                .padding(.leading, 14)
+                        }
                         Text("\u{256D}\u{2500} \u{2695} Hermes ")
                             .font(.system(size: 9, weight: .regular, design: .monospaced))
                             .foregroundColor(.hermes.opacity(0.8))
@@ -347,6 +383,15 @@ struct TerminalMessageView: View {
                         }
                     }
                     .padding(.leading, 14).padding(.vertical, 4)
+                    .contextMenu {
+                        if let mgr = manager, !mgr.eligibleForwardTargets.isEmpty {
+                            Button("Forward to Agent...") { showForwardPicker = true }
+                        }
+                        Button("Copy") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(msg.rawText, forType: .string)
+                        }
+                    }
                     HStack(spacing: 0) {
                         Text("\u{2570}\u{2500}")
                             .font(.system(size: 9, weight: .regular, design: .monospaced))
@@ -385,21 +430,10 @@ struct SegmentView: View {
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(Color(white: 0.12)).cornerRadius(4)
         case .diff(let file, let code):
-            VStack(alignment: .leading, spacing: 4) {
-                if !file.isEmpty {
-                    HStack {
-                        Image(systemName: "doc.badge.plus").font(.caption).foregroundColor(.hermes)
-                        Text(file).font(.system(size: 9, design: .monospaced)).foregroundColor(.secondary)
-                        Spacer()
-                        Button("Apply") {
-                            DispatchQueue.global().async { _ = XcodeContextProvider.shared.replaceSelection(with: code) }
-                        }.font(.system(size: 8, design: .monospaced)).buttonStyle(.plain).foregroundColor(.hermes)
-                    }
+            DiffPreviewView(file: file, code: code) {
+                DispatchQueue.global().async {
+                    _ = XcodeContextProvider.shared.replaceSelection(with: code)
                 }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    Text(code).font(.system(size: 10, design: .monospaced)).foregroundColor(Color(white: 0.8)).textSelection(.enabled)
-                }
-                .padding(8).background(Color(white: 0.08)).cornerRadius(6)
             }
         }
     }
@@ -531,26 +565,150 @@ struct TBtn: View {
 // MARK: - Build Log
 
 struct BuildLogView: View {
-    let log: [String]; let isBuilding: Bool; let onClose: () -> Void
+    let log: [String]
+    let isBuilding: Bool
+    let onClose: () -> Void
+
+    @State private var entries: [BuildLogEntry] = []
+    @State private var summary: BuildSummary?
+
     var body: some View {
         VStack(spacing: 0) {
+            // Header
             HStack {
-                Text(isBuilding ? "Building..." : "Build Log")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundColor(isBuilding ? .hermes : .green)
+                if let s = summary, !isBuilding {
+                    HStack(spacing: 6) {
+                        Image(systemName: s.succeeded ? "checkmark.circle.fill" : "xmark.octagon.fill")
+                            .font(.caption).foregroundColor(s.succeeded ? .green : .red)
+                        Text(s.succeeded ? "Build Succeeded" : "Build Failed")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        if s.errorCount > 0 {
+                            Text("\(s.errorCount) errors").font(.system(size: 9, design: .monospaced)).foregroundColor(.red)
+                        }
+                        if s.warningCount > 0 {
+                            Text("\(s.warningCount) warnings").font(.system(size: 9, design: .monospaced)).foregroundColor(.yellow)
+                        }
+                    }
+                } else {
+                    HStack(spacing: 6) {
+                        Circle().fill(Color.hermes).frame(width: 6, height: 6)
+                            .opacity(isBuilding ? 1 : 0)
+                        Text(isBuilding ? "Building..." : "Build Log")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundColor(isBuilding ? .hermes : .green)
+                    }
+                }
                 Spacer()
-                Button(action: onClose) { Image(systemName: "xmark.circle.fill").font(.caption).foregroundColor(.secondary) }
-                    .buttonStyle(.plain)
+                HStack(spacing: 4) {
+                    if !isBuilding {
+                        Button(action: copyLog) {
+                            Image(systemName: "doc.on.doc").font(.caption2)
+                        }.buttonStyle(.plain).foregroundColor(.secondary)
+                    }
+                    Button(action: onClose) {
+                        Image(systemName: "xmark.circle.fill").font(.caption).foregroundColor(.secondary)
+                    }.buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 8).padding(.vertical, 4)
-            ScrollViewReader { proxy in
-                ScrollView {
-                    Text(log.joined()).font(.system(size: 10, design: .monospaced)).foregroundColor(Color(white: 0.6))
-                        .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled).id("logBottom")
+
+            if !isBuilding, let s = summary, s.errorCount > 0 {
+                // Error list view
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 1) {
+                            ForEach(entries) { entry in
+                                BuildLogRow(entry: entry)
+                            }
+                        }
+                        .padding(4)
+                        .id("logBottom")
+                    }
+                    .onChange(of: entries.count) { _, _ in
+                        withAnimation { proxy.scrollTo("logBottom") }
+                    }
                 }
-                .onChange(of: log.count) { _, _ in withAnimation { proxy.scrollTo("logBottom") } }
+            } else {
+                // Raw log view (during build or no errors)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        Text(log.joined())
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(Color(white: 0.6))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                            .id("logBottom")
+                    }
+                    .onChange(of: log.count) { _, _ in
+                        withAnimation { proxy.scrollTo("logBottom") }
+                    }
+                }
             }
         }
+        .onChange(of: log) { _, newLog in
+            let full = newLog.joined()
+            entries = BuildLogParser.parse(full)
+            summary = BuildLogParser.summary(from: entries)
+        }
+    }
+
+    private func copyLog() {
+        let full = log.joined()
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(full, forType: .string)
+    }
+}
+
+// MARK: - Build Log Row
+
+struct BuildLogRow: View {
+    let entry: BuildLogEntry
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: entry.type.icon)
+                .font(.system(size: 8))
+                .foregroundColor(entry.type.color)
+                .frame(width: 12)
+
+            if let file = entry.file, let line = entry.line {
+                Button(action: { openInXcode(file: file, line: line) }) {
+                    Text("\((file as NSString).lastPathComponent):\(line)")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(entry.type.color.opacity(0.8))
+                }
+                .buttonStyle(.plain)
+                .help("Open in Xcode")
+            }
+
+            Text(entry.message)
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(Color(white: 0.7))
+                .lineLimit(2)
+        }
+        .padding(.vertical, 2).padding(.horizontal, 4)
+        .background(entry.type == .error ? Color.red.opacity(0.06) : Color.clear)
+        .cornerRadius(3)
+    }
+
+    private func openInXcode(file: String, line: Int) {
+        let fullPath: String
+        if file.hasPrefix("/") {
+            fullPath = file
+        } else {
+            fullPath = FileManager.default.currentDirectoryPath + "/" + file
+        }
+        let url = URL(fileURLWithPath: fullPath)
+        NSWorkspace.shared.open(url)
+        // Also try to open to specific line via AppleScript
+        let script = """
+        tell application "Xcode"
+            open "\(fullPath)"
+            activate
+        end tell
+        """
+        var err: NSDictionary?
+        NSAppleScript(source: script)?.executeAndReturnError(&err)
     }
 }
 

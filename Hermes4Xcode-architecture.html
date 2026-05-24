@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hermes4Xcode Architecture</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #020617;
+      min-height: 100vh;
+      padding: 2rem;
+      color: white;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot {
+      width: 12px; height: 12px; background: #FFD700; border-radius: 50%;
+      animation: pulse 2s infinite; box-shadow: 0 0 8px rgba(255,215,0,0.5);
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5); border-radius: 1rem;
+      border: 1px solid #1e293b; padding: 1.5rem; overflow-x: auto;
+    }
+    svg { width: 100%; min-width: 1050px; display: block; }
+    .cards {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 2rem;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.5); border-radius: 0.75rem;
+      border: 1px solid #1e293b; padding: 1.25rem;
+    }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.gold { background: #FFD700; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.amber { background: #fbbf24; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .card .planned { color: #fbbf24; }
+    .card .existing { color: #34d399; }
+    .card .future { color: #fb7185; }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>Hermes4Xcode — 基于 Hermes Agent 的优秀 Coding Agent 架构</h1>
+      </div>
+      <p class="subtitle">三层架构：Xcode IDE → Hermes4Xcode (macOS GUI) → Hermes Agent (Backend 引擎)</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1100 880">
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <marker id="arrow-gold" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#FFD700" />
+          </marker>
+          <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <!-- Background Grid -->
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- ================================================================ -->
+        <!-- LAYER 1: Xcode IDE -->
+        <!-- ================================================================ -->
+        <rect x="30" y="20" width="1040" height="150" rx="12" fill="rgba(30, 41, 59, 0.15)" stroke="#64748b" stroke-width="1.5"/>
+        <text x="48" y="42" fill="#94a3b8" font-size="10" font-weight="600">▲ LAYER 1: Xcode IDE</text>
+
+        <!-- Xcode Source Editor -->
+        <rect x="55" y="55" width="140" height="55" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="125" y="78" fill="white" font-size="11" font-weight="600" text-anchor="middle">Source Editor</text>
+        <text x="125" y="94" fill="#94a3b8" font-size="9" text-anchor="middle">代码编辑 + 选中</text>
+
+        <!-- Apple Events / Scripting -->
+        <rect x="220" y="55" width="140" height="55" rx="6" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="290" y="78" fill="white" font-size="11" font-weight="600" text-anchor="middle">AppleScript Bridge</text>
+        <text x="290" y="94" fill="#94a3b8" font-size="9" text-anchor="middle">读取/替换选中代码</text>
+
+        <!-- Custom Chat Provider -->
+        <rect x="385" y="55" width="160" height="55" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="465" y="78" fill="white" font-size="11" font-weight="600" text-anchor="middle">Custom Chat Provider</text>
+        <text x="465" y="94" fill="#94a3b8" font-size="9" text-anchor="middle">Xcode内联聊天面板</text>
+
+        <!-- xcodebuild CLI -->
+        <rect x="570" y="55" width="130" height="55" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="635" y="78" fill="white" font-size="11" font-weight="600" text-anchor="middle">xcodebuild</text>
+        <text x="635" y="94" fill="#94a3b8" font-size="9" text-anchor="middle">构建 / 测试</text>
+
+        <!-- iOS Simulator -->
+        <rect x="725" y="55" width="130" height="55" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="790" y="78" fill="white" font-size="11" font-weight="600" text-anchor="middle">iOS Simulator</text>
+        <text x="790" y="94" fill="#94a3b8" font-size="9" text-anchor="middle">运行 / 截图 / 录制</text>
+
+        <!-- Xcode Intelligence / MCP bridge -->
+        <rect x="880" y="55" width="160" height="55" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1"/>
+        <text x="960" y="78" fill="white" font-size="10" font-weight="600" text-anchor="middle">Xcode Intelligence</text>
+        <text x="960" y="94" fill="#94a3b8" font-size="9" text-anchor="middle">mcpbridge / 索引</text>
+
+        <!-- AppleScript arrow down -->
+        <path d="M 290 110 L 290 195" fill="none" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- xcodebuild CLI arrow down -->
+        <path d="M 635 110 L 635 195" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- ================================================================ -->
+        <!-- LAYER 2: Hermes4Xcode (macOS App) -->
+        <!-- ================================================================ -->
+        <rect x="30" y="185" width="1040" height="390" rx="12" fill="rgba(255, 215, 0, 0.04)" stroke="#FFD700" stroke-width="1.5"/>
+        <text x="48" y="207" fill="#FFD700" font-size="10" font-weight="600">▲ LAYER 2: Hermes4Xcode (macOS App · SwiftUI)</text>
+
+        <!-- === Column 1: UI Layer === -->
+        <text x="88" y="230" fill="#FFD700" font-size="9" font-weight="600">┌── UI Layer (View层) ──</text>
+
+        <!-- HermesChatView -->
+        <rect x="55" y="240" width="190" height="65" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="150" y="262" fill="white" font-size="11" font-weight="600" text-anchor="middle">HermesChatView</text>
+        <text x="150" y="278" fill="#94a3b8" font-size="9" text-anchor="middle">聊天主面板 + 流式渲染</text>
+        <text x="150" y="292" fill="#34d399" font-size="8" text-anchor="middle">✅ 已实现</text>
+
+        <!-- TabBarView + SidebarView -->
+        <rect x="55" y="315" width="190" height="65" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="150" y="337" fill="white" font-size="10" font-weight="600" text-anchor="middle">TabBarView + SidebarView</text>
+        <text x="150" y="354" fill="#94a3b8" font-size="9" text-anchor="middle">Tab栏 + 可折叠侧边栏</text>
+        <text x="150" y="368" fill="#34d399" font-size="8" text-anchor="middle">✅ 已实现</text>
+
+        <!-- DiffPreview (Planned) -->
+        <rect x="55" y="390" width="190" height="65" rx="6" fill="rgba(251, 191, 36, 0.1)" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,4"/>
+        <text x="150" y="412" fill="white" font-size="11" font-weight="600" text-anchor="middle">DiffPreviewView</text>
+        <text x="150" y="428" fill="#94a3b8" font-size="9" text-anchor="middle">代码修改预览 + Apply/Reject</text>
+        <text x="150" y="442" fill="#fbbf24" font-size="8" text-anchor="middle">🔄 Phase 1 优化目标</text>
+
+        <!-- AgentStatusBar (Planned) -->
+        <rect x="55" y="465" width="190" height="65" rx="6" fill="rgba(251, 191, 36, 0.1)" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,4"/>
+        <text x="150" y="487" fill="white" font-size="10" font-weight="600" text-anchor="middle">AgentStatusBar</text>
+        <text x="150" y="503" fill="#94a3b8" font-size="9" text-anchor="middle">协作状态仪表盘</text>
+        <text x="150" y="517" fill="#fbbf24" font-size="8" text-anchor="middle">🔄 Phase 2/3 优化目标</text>
+
+        <!-- === Column 2: Agent Layer === -->
+        <text x="300" y="230" fill="#FFD700" font-size="9" font-weight="600">┌── Agent Layer (逻辑层) ──</text>
+
+        <!-- AgentManager -->
+        <rect x="280" y="240" width="190" height="65" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="375" y="262" fill="white" font-size="11" font-weight="600" text-anchor="middle">AgentManager</text>
+        <text x="375" y="278" fill="#94a3b8" font-size="9" text-anchor="middle">Tab管理 + 消息流 + 模式</text>
+        <text x="375" y="292" fill="#34d399" font-size="8" text-anchor="middle">✅ 已实现</text>
+
+        <!-- AgentProfile + AgentTab -->
+        <rect x="280" y="315" width="190" height="65" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="375" y="337" fill="white" font-size="11" font-weight="600" text-anchor="middle">AgentProfile + AgentTab</text>
+        <text x="375" y="354" fill="#94a3b8" font-size="9" text-anchor="middle">角色模板 + 权限控制</text>
+        <text x="375" y="368" fill="#34d399" font-size="8" text-anchor="middle">✅ 已实现</text>
+
+        <!-- AgentCollaboration Engine (Planned) -->
+        <rect x="280" y="390" width="190" height="65" rx="6" fill="rgba(251, 191, 36, 0.1)" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,4"/>
+        <text x="375" y="412" fill="white" font-size="10" font-weight="600" text-anchor="middle">AgentCollaboration</text>
+        <text x="375" y="428" fill="#94a3b8" font-size="9" text-anchor="middle">转发/路由/自动分配</text>
+        <text x="375" y="442" fill="#fbbf24" font-size="8" text-anchor="middle">🔄 Phase 2/3 优化目标</text>
+
+        <!-- Tool Call Parser (Planned) -->
+        <rect x="280" y="465" width="190" height="65" rx="6" fill="rgba(251, 191, 36, 0.1)" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,4"/>
+        <text x="375" y="487" fill="white" font-size="10" font-weight="600" text-anchor="middle">ToolCall Visualizer</text>
+        <text x="375" y="503" fill="#94a3b8" font-size="9" text-anchor="middle">工具调用可视化</text>
+        <text x="375" y="517" fill="#fbbf24" font-size="8" text-anchor="middle">🔄 Phase 1 优化目标</text>
+
+        <!-- === Column 3: Bridge Layer === -->
+        <text x="535" y="230" fill="#FFD700" font-size="9" font-weight="600">┌── Bridge Layer (桥接层) ──</text>
+
+        <!-- XcodeContext (AppleScript) -->
+        <rect x="520" y="240" width="190" height="65" rx="6" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="615" y="262" fill="white" font-size="11" font-weight="600" text-anchor="middle">XcodeContext</text>
+        <text x="615" y="278" fill="#94a3b8" font-size="9" text-anchor="middle">AppleScript 控制层</text>
+        <text x="615" y="292" fill="#34d399" font-size="8" text-anchor="middle">✅ 已实现</text>
+
+        <!-- SourceKitLSP -->
+        <rect x="520" y="315" width="190" height="65" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="615" y="337" fill="white" font-size="11" font-weight="600" text-anchor="middle">SourceKitLSP</text>
+        <text x="615" y="354" fill="#94a3b8" font-size="9" text-anchor="middle">代码诊断 + 补全</text>
+        <text x="615" y="368" fill="#34d399" font-size="8" text-anchor="middle">✅ 已实现</text>
+
+        <!-- MessageParser -->
+        <rect x="520" y="390" width="190" height="65" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="615" y="412" fill="white" font-size="11" font-weight="600" text-anchor="middle">MessageParser</text>
+        <text x="615" y="428" fill="#94a3b8" font-size="9" text-anchor="middle">消息解析 + 分段渲染</text>
+        <text x="615" y="442" fill="#34d399" font-size="8" text-anchor="middle">✅ 已实现</text>
+
+        <!-- TerminalMessageView -->
+        <rect x="520" y="465" width="190" height="65" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="615" y="487" fill="white" font-size="10" font-weight="600" text-anchor="middle">TerminalMessageView</text>
+        <text x="615" y="503" fill="#94a3b8" font-size="9" text-anchor="middle">终端风格消息渲染</text>
+        <text x="615" y="517" fill="#34d399" font-size="8" text-anchor="middle">✅ 已实现</text>
+
+        <!-- === Column 4: Data / Client === -->
+        <text x="770" y="230" fill="#FFD700" font-size="9" font-weight="600">┌── Client Layer (通信层) ──</text>
+
+        <!-- HermesAPIClient SSE -->
+        <rect x="755" y="240" width="190" height="65" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="850" y="262" fill="white" font-size="11" font-weight="600" text-anchor="middle">HermesAPIClient</text>
+        <text x="850" y="278" fill="#94a3b8" font-size="9" text-anchor="middle">SSE 流式客户端</text>
+        <text x="850" y="292" fill="#34d399" font-size="8" text-anchor="middle">✅ 已实现</text>
+
+        <!-- ToolCall Parser (Planned) -->
+        <rect x="755" y="315" width="190" height="65" rx="6" fill="rgba(251, 191, 36, 0.1)" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,4"/>
+        <text x="850" y="337" fill="white" font-size="10" font-weight="600" text-anchor="middle">BuildLogView</text>
+        <text x="850" y="354" fill="#94a3b8" font-size="9" text-anchor="middle">构建日志实时展示</text>
+        <text x="850" y="368" fill="#34d399" font-size="8" text-anchor="middle">✅ 已实现</text>
+
+        <!-- XcodeToolbarView -->
+        <rect x="755" y="390" width="190" height="65" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="850" y="412" fill="white" font-size="10" font-weight="600" text-anchor="middle">XcodeToolbarView</text>
+        <text x="850" y="428" fill="#94a3b8" font-size="9" text-anchor="middle">权限感知工具栏</text>
+        <text x="850" y="442" fill="#34d399" font-size="8" text-anchor="middle">✅ 已实现</text>
+
+        <!-- StoredMessage / Persistence -->
+        <rect x="755" y="465" width="190" height="65" rx="6" fill="rgba(251, 191, 36, 0.1)" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,4"/>
+        <text x="850" y="487" fill="white" font-size="10" font-weight="600" text-anchor="middle">ConversationStore</text>
+        <text x="850" y="503" fill="#94a3b8" font-size="9" text-anchor="middle">对话持久化 (Codable)</text>
+        <text x="850" y="517" fill="#fbbf24" font-size="8" text-anchor="middle">🔄 Phase 2 优化目标</text>
+
+        <!-- ================================================================ -->
+        <!-- Data Flow Arrows (vertical) -->
+        <!-- ================================================================ -->
+
+        <!-- Xcode AppleScript <-> XcodeContext -->
+        <path d="M 290 110 L 290 170 Q 290 180 280 180 L 280 195 Q 280 210 290 210 L 290 238" fill="none" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="270" y="160" fill="#fb7185" font-size="8">Apple Events</text>
+
+        <!-- HermesAPIClient <-> Gateway SSE -->
+        <path d="M 850 507 L 850 565 Q 850 580 860 580 L 860 600" fill="none" stroke="#FFD700" stroke-width="2" marker-end="url(#arrow-gold)"/>
+        <text x="862" y="550" fill="#FFD700" font-size="8">SSE Stream</text>
+
+        <!-- HermesChatView -> DiffPreview + ToolCall flow (internal app) -->
+        <path d="M 245 272 L 278 272" fill="none" stroke="#64748b" stroke-width="1" marker-end="url(#arrow)"/>
+        <path d="M 470 272 L 518 272" fill="none" stroke="#64748b" stroke-width="1" marker-end="url(#arrow)"/>
+        <path d="M 615 305 L 615 310 L 850 310 L 850 313" fill="none" stroke="#64748b" stroke-width="1" marker-end="url(#arrow)"/>
+        <path d="M 470 348 L 518 348" fill="none" stroke="#64748b" stroke-width="1" marker-end="url(#arrow)"/>
+
+        <!-- ================================================================ -->
+        <!-- LAYER 3: Hermes Agent Backend -->
+        <!-- ================================================================ -->
+        <rect x="30" y="585" width="1040" height="260" rx="12" fill="rgba(255, 215, 0, 0.04)" stroke="#FFD700" stroke-width="1.5"/>
+        <text x="48" y="607" fill="#FFD700" font-size="10" font-weight="600">▲ LAYER 3: Hermes Agent (Backend · 部署于用户主机)</text>
+
+        <!-- Gateway API -->
+        <rect x="55" y="620" width="160" height="55" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="135" y="642" fill="white" font-size="11" font-weight="600" text-anchor="middle">Gateway API</text>
+        <text x="135" y="658" fill="#94a3b8" font-size="9" text-anchor="middle">port 8642 · OpenAI 兼容</text>
+        <text x="135" y="672" fill="#34d399" font-size="8" text-anchor="middle">✅ 运行中</text>
+
+        <!-- Agent ReAct Loop -->
+        <rect x="250" y="620" width="160" height="55" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="330" y="642" fill="white" font-size="11" font-weight="600" text-anchor="middle">Agent ReAct Loop</text>
+        <text x="330" y="658" fill="#94a3b8" font-size="9" text-anchor="middle">LLM + 工具循环</text>
+        <text x="330" y="672" fill="#34d399" font-size="8" text-anchor="middle">✅ 核心引擎</text>
+
+        <!-- LLM Model Provider -->
+        <rect x="445" y="620" width="140" height="55" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="515" y="642" fill="white" font-size="11" font-weight="600" text-anchor="middle">LLM Provider</text>
+        <text x="515" y="658" fill="#94a3b8" font-size="9" text-anchor="middle">OpenRouter/Anthropic/...</text>
+        <text x="515" y="672" fill="#34d399" font-size="8" text-anchor="middle">✅ 可切换</text>
+
+        <!-- Arrow: Gateway -> ReAct Loop -->
+        <line x1="215" y1="647" x2="248" y2="647" stroke="#FFD700" stroke-width="1.5" marker-end="url(#arrow-gold)"/>
+
+        <!-- Arrow: ReAct Loop -> LLM -->
+        <line x1="410" y1="647" x2="443" y2="647" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- Tools Section -->
+        <text x="55" y="708" fill="#FFD700" font-size="9" font-weight="600">┌── Hermes Toolset (工具集) ──</text>
+
+        <!-- File Tools -->
+        <rect x="55" y="718" width="110" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="110" y="738" fill="white" font-size="10" font-weight="600" text-anchor="middle">File Tools</text>
+        <text x="110" y="754" fill="#94a3b8" font-size="9" text-anchor="middle">read/write/patch</text>
+
+        <!-- Terminal -->
+        <rect x="180" y="718" width="100" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="230" y="738" fill="white" font-size="10" font-weight="600" text-anchor="middle">Terminal</text>
+        <text x="230" y="754" fill="#94a3b8" font-size="9" text-anchor="middle">shell cmds</text>
+
+        <!-- MCP Client -->
+        <rect x="295" y="718" width="100" height="50" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="345" y="738" fill="white" font-size="10" font-weight="600" text-anchor="middle">MCP Client</text>
+        <text x="345" y="754" fill="#94a3b8" font-size="9" text-anchor="middle">xcodebuildmcp</text>
+
+        <!-- Git Tools -->
+        <rect x="410" y="718" width="90" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="455" y="738" fill="white" font-size="10" font-weight="600" text-anchor="middle">Git</text>
+        <text x="455" y="754" fill="#94a3b8" font-size="9" text-anchor="middle">commit/push</text>
+
+        <!-- Search Tools -->
+        <rect x="515" y="718" width="100" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="565" y="738" fill="white" font-size="10" font-weight="600" text-anchor="middle">Search</text>
+        <text x="565" y="754" fill="#94a3b8" font-size="9" text-anchor="middle">grep/find/code</text>
+
+        <!-- Arrow: ReAct -> Tools -->
+        <path d="M 330 675 L 330 695 Q 330 700 230 700 L 230 716" fill="none" stroke="#34d399" stroke-width="1" marker-end="url(#arrow)"/>
+        <path d="M 330 675 L 330 695 Q 330 700 345 700 L 345 716" fill="none" stroke="#fbbf24" stroke-width="1" marker-end="url(#arrow)"/>
+        <path d="M 330 675 L 330 695 Q 330 700 455 700 L 455 716" fill="none" stroke="#34d399" stroke-width="1" marker-end="url(#arrow)"/>
+
+        <!-- Sessions & Memory -->
+        <rect x="640" y="620" width="160" height="55" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="720" y="642" fill="white" font-size="10" font-weight="600" text-anchor="middle">Sessions + Memory</text>
+        <text x="720" y="658" fill="#94a3b8" font-size="9" text-anchor="middle">SQLite 持久化</text>
+        <text x="720" y="672" fill="#34d399" font-size="8" text-anchor="middle">✅ Hermes 内置</text>
+
+        <!-- Skills + Cron -->
+        <rect x="640" y="718" width="160" height="50" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="720" y="738" fill="white" font-size="10" font-weight="600" text-anchor="middle">Skills + Cron</text>
+        <text x="720" y="754" fill="#94a3b8" font-size="9" text-anchor="middle">可复用流程 + 定时</text>
+
+        <!-- MCP Server xcodebuildmcp -->
+        <rect x="835" y="700" width="200" height="80" rx="8" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="935" y="720" fill="white" font-size="11" font-weight="600" text-anchor="middle">xcodebuildmcp v2.5.2</text>
+        <text x="935" y="738" fill="#94a3b8" font-size="9" text-anchor="middle">构建 / 测试 / 截图</text>
+        <text x="935" y="752" fill="#94a3b8" font-size="9" text-anchor="middle">模拟器 / 覆盖率 / UI</text>
+        <text x="935" y="768" fill="#fbbf24" font-size="8" text-anchor="middle">24 tools · 15 workflows</text>
+
+        <!-- Arrow: MCP Client -> xcodebuildmcp -->
+        <line x1="395" y1="743" x2="833" y2="735" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- ================================================================ -->
+        <!-- LEGEND -->
+        <!-- ================================================================ -->
+        <rect x="835" y="620" width="200" height="65" rx="6" fill="rgba(15, 23, 42, 0.6)" stroke="#1e293b" stroke-width="1"/>
+        <text x="845" y="638" fill="white" font-size="10" font-weight="600">图例</text>
+
+        <rect x="845" y="648" width="12" height="8" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="862" y="655" fill="#34d399" font-size="8">✅ 已实现</text>
+
+        <rect x="845" y="662" width="12" height="8" rx="2" fill="transparent" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="862" y="669" fill="#fbbf24" font-size="8">🔄 优化目标</text>
+
+        <rect x="930" y="648" width="12" height="8" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="947" y="655" fill="#22d3ee" font-size="8">Frontend/UI</text>
+
+        <rect x="930" y="662" width="12" height="8" rx="2" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1"/>
+        <text x="947" y="669" fill="#fb7185" font-size="8">AppleScript/Security</text>
+      </svg>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot gold"></div>
+          <h3>设计原则</h3>
+        </div>
+        <ul>
+          <li class="existing">• <b>复用 Hermes 引擎</b> — 不重复造轮子， Gateway 已经在跑 Agent 循环</li>
+          <li class="existing">• <b>GUI 增强</b> — 所有优化都是给 Hermes 已有的能力加可视化外壳</li>
+          <li class="planned">• <b>可见性优先</b> — 让用户看到 agent 在做什么（tool calls、构建过程）</li>
+          <li class="planned">• <b>控制感优先</b> — diff 预览、apply/reject、undo 机制</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>现有能力（Hermes 已提供）</h3>
+        </div>
+        <ul>
+          <li class="existing">• Tool Execution Engine（ReAct 循环）</li>
+          <li class="existing">• 20+ toolsets（file / terminal / MCP / git）</li>
+          <li class="existing">• Session 持久化（SQLite）</li>
+          <li class="existing">• Skills + Memory 跨会话知识</li>
+          <li class="existing">• Cron 定时任务调度</li>
+          <li class="existing">• MCP 服务器集成（xcodebuildmcp）</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>优化路线图</h3>
+        </div>
+        <ul>
+          <li class="planned"><b>Phase 1 (现在)</b></li>
+          <li class="planned">  ┝ ToolCall Visualizer — Gateway 工具调用过程可视化</li>
+          <li class="planned">  ┝ DiffPreviewView — 代码修改预览 + Apply/Reject</li>
+          <li class="planned">  ┕ BuildLogView 增强 — 构建结果智能解析</li>
+          <li class="future"><b>Phase 2</b></li>
+          <li class="future">  ┝ ConversationStore — 对话持久化 (Codable)</li>
+          <li class="future">  ┝ AgentCollaboration — 转发/路由/协作</li>
+          <li class="future"><b>Phase 3</b></li>
+          <li class="future">  ┝ AgentStatusBar — 多 Agent 状态仪表盘</li>
+          <li class="future">  ┕ LSP 深度集成 — 符号级代码理解</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <p class="footer">
+      Hermes4Xcode — 基于 Hermes Agent v4 · Xcode 26.5 · macOS 26.3 · Swift 5
+    </p>
+  </div>
+</body>
+</html>
