@@ -137,14 +137,29 @@ struct SidebarView: View {
         agentManager.tabs = []
         agentManager.activeTabId = UUID()
         agentManager.hasNamedConversation = false
-        // Re-init with fresh supervisor tab
-        let welcome = StoredMessage(role: "assistant", text: AgentManager.welcomeText + "\n\nLet's create our app！")
-        var defaultTab = AgentTab(id: UUID(), name: "supervisor", template: .supervisor)
-        defaultTab.roleDescription = AgentTemplate.supervisor.defaultRole
-        defaultTab.systemPrompt = AgentTemplate.supervisor.defaultPrompt
-        defaultTab.permissions = AgentTemplate.supervisor.defaultPermissions
-        defaultTab.messages = [welcome]
-        agentManager.tabs.append(defaultTab)
+        // Re-init with full dev team
+        let welcome = StoredMessage(role: "assistant", text: AgentManager.welcomeText + "\n\nI'm your **Supervisor**. I'll coordinate the team for you today.\n\n**Your Dev Team:**\n🎯 Product Manager — requirements & specs\n🎨 UI Designer — interface & HIG\n🔨 Developer — implementation\n🐜 QA Engineer — testing & quality\n👑 Tech Lead — architecture & review\n📄 Documenter — docs & notes\n\nWhat are we building today?")
+        var supervisor = AgentTab(id: UUID(), name: "supervisor", template: .supervisor)
+        supervisor.roleDescription = AgentTemplate.supervisor.defaultRole
+        supervisor.systemPrompt = AgentTemplate.supervisor.defaultPrompt
+        supervisor.permissions = AgentTemplate.supervisor.defaultPermissions
+        supervisor.messages = [welcome]
+        agentManager.tabs.append(supervisor)
+
+        let team: [(String, AgentTemplate)] = [
+            ("product-manager", .productManager),
+            ("ui-designer", .uiDesigner),
+            ("developer", .developer),
+            ("qa-engineer", .qaEngineer),
+            ("tech-lead", .techLead),
+            ("documenter", .documenter),
+        ]
+        for (name, template) in team {
+            let profile = AgentProfile(name: name, template: template)
+            var tab = AgentTab(name: name, template: template)
+            tab.applyProfile(profile)
+            agentManager.tabs.append(tab)
+        }
         agentManager.activeTabId = agentManager.tabs[0].id
         store.currentConversationId = UUID()
         selectedPage = .chat

@@ -17,8 +17,8 @@ final class AgentManagerTests: XCTestCase {
 
     // MARK: - Initial State
 
-    func test_init_createsOneTab() {
-        XCTAssertEqual(manager.tabs.count, 1)
+    func test_init_createsFullTeam() {
+        XCTAssertEqual(manager.tabs.count, 7)
     }
 
     func test_init_defaultTab_isSupervisor() {
@@ -38,7 +38,7 @@ final class AgentManagerTests: XCTestCase {
         XCTAssertFalse(first.messages.isEmpty)
         let welcome = first.messages[0]
         XCTAssertEqual(welcome.role, "assistant")
-        XCTAssertTrue(welcome.text.contains("Let's create our app"))
+        XCTAssertTrue(welcome.text.contains("Supervisor"))
     }
 
     func test_init_activeTabId_matchesFirstTab() {

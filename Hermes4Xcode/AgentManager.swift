@@ -41,13 +41,32 @@ final class AgentManager: ObservableObject {
     private let client = HermesAPIClient()
 
     init() {
-        let welcome = StoredMessage(role: "assistant", text: AgentManager.welcomeText + "\n\nLet's create our app！")
-        var defaultTab = AgentTab(id: UUID(), name: "supervisor", template: .supervisor)
-        defaultTab.roleDescription = AgentTemplate.supervisor.defaultRole
-        defaultTab.systemPrompt = AgentTemplate.supervisor.defaultPrompt
-        defaultTab.permissions = AgentTemplate.supervisor.defaultPermissions
-        defaultTab.messages = [welcome]
-        tabs.append(defaultTab)
+        let welcome = StoredMessage(role: "assistant", text: AgentManager.welcomeText + "\n\nI'm your **Supervisor**. I'll coordinate the team for you today.\n\n**Your Dev Team:**\n🎯 Product Manager — requirements & specs\n🎨 UI Designer — interface & HIG\n🔨 Developer — implementation\n🐜 QA Engineer — testing & quality\n👑 Tech Lead — architecture & review\n📄 Documenter — docs & notes\n\nWhat are we building today?")
+
+        // Supervisor (default active tab)
+        var supervisor = AgentTab(id: UUID(), name: "supervisor", template: .supervisor)
+        supervisor.roleDescription = AgentTemplate.supervisor.defaultRole
+        supervisor.systemPrompt = AgentTemplate.supervisor.defaultPrompt
+        supervisor.permissions = AgentTemplate.supervisor.defaultPermissions
+        supervisor.messages = [welcome]
+        tabs.append(supervisor)
+
+        // Dev Team
+        let team: [(String, AgentTemplate)] = [
+            ("product-manager", .productManager),
+            ("ui-designer", .uiDesigner),
+            ("developer", .developer),
+            ("qa-engineer", .qaEngineer),
+            ("tech-lead", .techLead),
+            ("documenter", .documenter),
+        ]
+        for (name, template) in team {
+            let profile = AgentProfile(name: name, template: template)
+            var tab = AgentTab(name: name, template: template)
+            tab.applyProfile(profile)
+            tabs.append(tab)
+        }
+
         activeTabId = tabs[0].id
     }
 
