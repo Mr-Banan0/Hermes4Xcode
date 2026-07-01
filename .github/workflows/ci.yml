@@ -34,17 +34,7 @@ jobs:
       - name: SwiftLint
         run: swiftlint --strict
 
-      - name: Build
-        run: |
-          xcodebuild build \
-            -project Hermes4Xcode.xcodeproj \
-            -scheme Hermes4Xcode \
-            -configuration Debug \
-            -derivedDataPath DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
-            ONLY_ACTIVE_ARCH=YES
-
-      - name: Test
+      - name: Build & Test
         run: |
           xcodebuild test \
             -project Hermes4Xcode.xcodeproj \
