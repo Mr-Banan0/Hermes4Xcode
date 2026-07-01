@@ -2,10 +2,11 @@ import Foundation
 
 // MARK: - Agent Permissions
 
-/// 细粒度的工具权限控制。8 个 bool 直接绑定 UI toggle。
+/// 细粒度的工具权限控制。9 个 bool 直接绑定 UI toggle。
 struct AgentPermissions: Codable, Equatable {
     var readFile: Bool = true
     var writeCode: Bool = true
+    var writeTests: Bool = true    // 只允许写入测试目录（*Tests/ 或 *Test.swift）
     var build: Bool = true
     var test: Bool = true
     var analyze: Bool = true
@@ -16,15 +17,31 @@ struct AgentPermissions: Codable, Equatable {
     static let all = Self()
 
     static let docOnly = Self(
-        readFile: true, writeCode: false, build: false, test: false,
+        readFile: true, writeCode: false, writeTests: false, build: false, test: false,
         analyze: false, commit: false, structure: true, note: true
     )
 
-    /// Reviewer 权限：读 + 构建 + 分析 + 结构 + 笔记
+    /// Reviewer 默认：读 + 写测试 + 构建 + 跑测试 + 分析 + 结构 + 笔记
+    /// 不能写源码（writeCode: false），但可以写验证用的测试代码
     static let reviewer = Self(
-        readFile: true, writeCode: false, build: true, test: false,
+        readFile: true, writeCode: false, writeTests: true, build: true, test: true,
         analyze: true, commit: false, structure: true, note: true
     )
+
+    /// 检查是否允许写入指定路径
+    func canWrite(to path: String) -> Bool {
+        if writeCode { return true }                       // 全写权限
+        if writeTests, isTestPath(path) { return true }    // 仅测试文件
+        return false
+    }
+
+    private func isTestPath(_ path: String) -> Bool {
+        path.contains("Hermes4XcodeTests/")
+            || path.contains("Tests/")
+            || path.hasSuffix("Tests.swift")
+            || path.hasSuffix("Test.swift")
+            || path.hasSuffix("TestPlan")
+    }
 }
 
 // MARK: - Agent Template
@@ -127,6 +144,10 @@ General guidelines:
 - Read the file before reviewing it
 - Structure feedback with ✅ what's good / ⚠️ issues / 📋 summary
 - Prefer `patch` over `write_file` for suggesting changes to existing files
+- Write test code to **automatically verify functionality**:
+  - Write XCUITest cases into `Hermes4XcodeTests/` to simulate button taps, state changes, data flow
+  - Run them immediately: build + test via xcodebuild
+  - Report pass/fail with the actual test output
 
 **Functional Simulation (mandatory on every review):**
 After reviewing the code, you MUST simulate the feature's behavior:
