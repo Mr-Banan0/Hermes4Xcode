@@ -1,6 +1,44 @@
 import Combine
 import SwiftUI
 
+// MARK: - Build Result Model
+
+/// Captures the outcome of an async xcodebuild run for LLM context injection.
+struct BuildResult: Codable {
+    let exitCode: Int32
+    let output: String
+    let timestamp: Date
+    let duration: TimeInterval
+
+    var isSuccess: Bool { exitCode == 0 }
+
+    var summary: String {
+        let status = isSuccess ? "✅ Succeeded" : "❌ Failed (exit code \(exitCode))"
+        return "Build \(status) in \(String(format: "%.1f", duration))s"
+    }
+
+    var contextBlock: String {
+        """
+        [Build Result — \(summary)]
+        ```
+        \(output.isEmpty ? "(no output)" : String(output.suffix(2000)))
+        ```
+        """
+    }
+}
+
+/// Tracks multi-agent workflow progression.
+enum WorkflowPhase: String, Codable {
+    case idle
+    case planning         // Supervisor analyzing request
+    case delegated        // Supervisor → Developer
+    case implementing     // Developer working
+    case reviewing        // Developer → Reviewer
+    case documenting      // Reviewer → Documenter
+    case verifying        // Developer re-checking after review
+    case complete
+}
+
 // MARK: - Agent Manager
 
 final class AgentManager: ObservableObject {
@@ -16,11 +54,32 @@ final class AgentManager: ObservableObject {
     // Streaming flag per tab (not persisted)
     var streamingTabs: Set<UUID> = []
     var streamingTexts: [UUID: String] = [:]
+    /// Reasoning/thinking content streamed from the model (e.g. DeepSeek reasoning)
+    var streamingReasoningTexts: [UUID: String] = [:]
 
     // Tool call tracking for LiveToolCallBar
     @Published var activeToolCalls: [ToolCallInfo] = []
+    /// Persisted tool calls from the current message session (kept after streaming ends)
+    @Published var toolCallHistory: [ToolCallInfo] = []
     @Published var streamingPhase: StreamingPhase = .idle
     @Published var phaseResults: [PhaseResult] = []
+
+    /// Gateway connection status for status bar
+    @Published var isGatewayOnline = false
+    /// Summary counts for status bar
+    @Published var totalToolCallsThisSession = 0
+    @Published var successfulToolCalls = 0
+    @Published var failedToolCalls = 0
+
+    /// LSP diagnostics summary for status bar
+    @Published var lspErrorCount = 0
+    @Published var lspWarningCount = 0
+    @Published var lspDiagnostics: [LSPDiagnosticItem] = []
+
+    /// Per-tab build result cache — injected into next message history
+    var lastBuildResults: [UUID: BuildResult] = [:]
+    /// Per-tab workflow phase tracking for auto-progression
+    var workflowPhases: [UUID: WorkflowPhase] = [:]
 
     private let toolCallPatterns: [(emoji: String, name: String, icon: String)] = [
         ("🛠", "Build", "hammer.fill"),
@@ -40,8 +99,48 @@ final class AgentManager: ObservableObject {
 
     private let client = HermesAPIClient()
 
+    private var healthPollTimer: Timer?
+
     init() {
-        let welcome = StoredMessage(role: "assistant", text: AgentManager.welcomeText + "\n\nI'm your **Supervisor**. I'll coordinate the team for you today.\n\n**Your Dev Team:**\n🎯 Product Manager — requirements & specs\n🎨 UI Designer — interface & HIG\n🔨 Developer — implementation\n🐜 QA Engineer — testing & quality\n👑 Tech Lead — architecture & review\n📄 Documenter — docs & notes\n\nWhat are we building today?")
+        let defaultTabs = Self.makeDefaultTabs()
+        tabs = defaultTabs
+        activeTabId = defaultTabs[0].id
+        startHealthPolling()
+        // Wire up LSP diagnostic updates to @Published properties
+        SourceKitLSPClient.shared.onDiagnosticsChanged = { [weak self] items in
+            DispatchQueue.main.async {
+                self?.lspDiagnostics = items
+                self?.lspErrorCount = items.filter { $0.severity == .error }.count
+                self?.lspWarningCount = items.filter { $0.severity == .warning }.count
+            }
+        }
+
+        // Wire up build result tracking from XcodeContextProvider
+        XcodeContextProvider.shared.onBuildComplete = { [weak self] exitCode, output in
+            guard let self else { return }
+            // Store the result for the active tab so it's injected into next history
+            let result = BuildResult(
+                exitCode: exitCode,
+                output: output,
+                timestamp: Date(),
+                duration: 0  // exact duration tracked inside provider
+            )
+            self.lastBuildResults[self.activeTabId] = result
+            if result.isSuccess {
+                self.addPhaseResult(icon: "🛠", title: "Build", detail: "Succeeded", status: .success)
+            } else {
+                self.addPhaseResult(icon: "🛠", title: "Build", detail: "Failed (exit \(exitCode))", status: .failure)
+            }
+        }
+    }
+
+    deinit {
+        healthPollTimer?.invalidate()
+    }
+
+    /// Create the default team of agent tabs (Supervisor + Dev Team).
+    static func makeDefaultTabs() -> [AgentTab] {
+        let welcome = StoredMessage(role: "assistant", text: "👋 Welcome to **Hermes4Xcode**! I coordinate the team.\\n\\n**Your Team:**\\n👓 Reviewer — review, design, QA, specs & architecture\\n🔨 Developer — implementation\\n📄 Documenter — docs & notes\\n\\n**Agent Protocol:**\\n- `[delegate to developer]` or `@developer:` — route a task\\n- `[report back]` or `[report to supervisor]` — return results\\n- `[report to reviewer]` — send for review\\n\\nWhat are we building today?")
 
         // Supervisor (default active tab)
         var supervisor = AgentTab(id: UUID(), name: "supervisor", template: .supervisor)
@@ -49,15 +148,13 @@ final class AgentManager: ObservableObject {
         supervisor.systemPrompt = AgentTemplate.supervisor.defaultPrompt
         supervisor.permissions = AgentTemplate.supervisor.defaultPermissions
         supervisor.messages = [welcome]
-        tabs.append(supervisor)
+
+        var tabs = [supervisor]
 
         // Dev Team
         let team: [(String, AgentTemplate)] = [
-            ("product-manager", .productManager),
-            ("ui-designer", .uiDesigner),
+            ("reviewer", .reviewer),
             ("developer", .developer),
-            ("qa-engineer", .qaEngineer),
-            ("tech-lead", .techLead),
             ("documenter", .documenter),
         ]
         for (name, template) in team {
@@ -67,7 +164,7 @@ final class AgentManager: ObservableObject {
             tabs.append(tab)
         }
 
-        activeTabId = tabs[0].id
+        return tabs
     }
 
     // MARK: - Tab Management
@@ -178,7 +275,12 @@ final class AgentManager: ObservableObject {
 
         streamingTabs.insert(tabId)
         streamingTexts[tabId] = ""
+        streamingReasoningTexts[tabId] = ""
         isStreaming = true
+        // Reset tool call tracking for new message
+        activeToolCalls = []
+        toolCallHistory = []
+        phaseResults = []
 
         // Ensure a fresh conversation ID for new conversations
         if ConversationStore.shared.currentConversationId == nil {
@@ -199,6 +301,16 @@ final class AgentManager: ObservableObject {
             history.append(["role": "system", "content": combinedPrompt])
         }
 
+        // Inject last build result if available and relevant
+        if let buildResult = lastBuildResults[tabId], !buildResult.output.isEmpty {
+            history.append(["role": "system", "content": buildResult.contextBlock])
+        }
+
+        // Inject current workflow phase as system context
+        if let phase = workflowPhases[tabId], phase != .idle {
+            history.append(["role": "system", "content": "[Current Workflow Phase: \(phase.rawValue)]"])
+        }
+
         // Append conversation history
         history += tab.messages.map { ["role": $0.role, "content": $0.text] }
 
@@ -217,6 +329,16 @@ final class AgentManager: ObservableObject {
                         self.updatePhase(from: self.streamingTexts[tabId] ?? "")
                     }
                 },
+                onReasoningDelta: { reasoning in
+                    Task { @MainActor in
+                        self.streamingReasoningTexts[tabId] = (self.streamingReasoningTexts[tabId] ?? "") + reasoning
+                        // Show reasoning content by making it the "visible" text during thinking
+                        if (self.streamingTexts[tabId] ?? "").isEmpty {
+                            self.currentAssistantText = self.streamingReasoningTexts[tabId] ?? ""
+                        }
+                        self.streamingPhase = .thinking
+                    }
+                },
                 onComplete: { result in
                     Task { @MainActor in
                         self.streamingTabs.remove(tabId)
@@ -227,6 +349,7 @@ final class AgentManager: ObservableObject {
                             self.appendMessage(StoredMessage(role: "assistant", text: full), to: tabId)
                             self.checkForAgentCreation(full)
                             self.checkForDelegation(full)
+                            self.checkForReportBack(full, from: tabId)
                             self.detectAndNameConversation(from: full, userText: text)
                         case .failure(let err):
                             self.appendMessage(StoredMessage(role: "assistant", text: "Error: \(err.localizedDescription)"), to: tabId)
@@ -234,12 +357,6 @@ final class AgentManager: ObservableObject {
                         self.currentAssistantText = ""
                         // Auto-save after each message completes
                         self.autoSave()
-                        // Clear tool calls after streaming completes
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                self.activeToolCalls = []
-                            }
-                        }
                     }
                 },
             )
@@ -248,29 +365,33 @@ final class AgentManager: ObservableObject {
 
     // MARK: - Phase Tracking
 
-    /// Update streaming phase based on accumulated streaming text
+    /// Update streaming phase based on accumulated streaming text.
+    /// Uses word-boundary regex on the last non-empty line to avoid false matches
+    /// on adjacent words (e.g. "understand buildings" should not trigger "build" phase).
     func updatePhase(from text: String) {
         guard !text.isEmpty else {
             streamingPhase = .thinking
             return
         }
 
-        let lower = text.lowercased()
-        let last100 = String(lower.suffix(100))
+        // Get the last non-empty line — phase is driven by what the LLM is saying right now
+        let lines = text.components(separatedBy: .newlines)
+        let lastLine = lines.reversed().first { !$0.trimmingCharacters(in: .whitespaces).isEmpty } ?? ""
+        let lower = lastLine.lowercased()
 
-        if last100.contains("build") || last100.contains("compil") || last100.contains("xcodebuild") {
+        if lower.range(of: #"\b(build(ing|s)?|compil(e|ing|ation)|xcodebuild)\b"#, options: .regularExpression) != nil {
             streamingPhase = .building
-        } else if last100.contains("read") || last100.contains("check") || last100.contains("look") || last100.contains("open") {
+        } else if lower.range(of: #"\b(read(ing)?|check(ing|ed)?|look(ing|ed)?|open(ing|ed)?)\b"#, options: .regularExpression) != nil {
             streamingPhase = .reading
-        } else if last100.contains("plan") || last100.contains("first") || last100.contains("step") || last100.contains("will do") {
+        } else if lower.range(of: #"\b(plan(ning|s)?|first|step(s)?|will do)\b"#, options: .regularExpression) != nil {
             streamingPhase = .planning
-        } else if last100.contains("creat") || last100.contains("write") || last100.contains("implement") || last100.contains("add ") {
+        } else if lower.range(of: #"\b(creat(e|ing)|writ(e|ing|es?)|implement(ing|ation)?|add(ing|ed)?)\b"#, options: .regularExpression) != nil {
             streamingPhase = .writing
-        } else if last100.contains("analyz") || last100.contains("structur") || last100.contains("architectur") || last100.contains("understand") {
+        } else if lower.range(of: #"\b(analyz(e|ing)|structur(e|ing)|architectur(e|ing)|understand(ing)?)\b"#, options: .regularExpression) != nil {
             streamingPhase = .analyzing
-        } else if last100.contains("test") || last100.contains("run") {
+        } else if lower.range(of: #"\b(test(ing|s)?|run(ning)?)\b"#, options: .regularExpression) != nil {
             streamingPhase = .testing
-        } else if last100.contains("search") || last100.contains("find") || last100.contains("locate") {
+        } else if lower.range(of: #"\b(search(ing|ed)?|find(ing)?|locat(e|ing))\b"#, options: .regularExpression) != nil {
             streamingPhase = .searching
         } else {
             streamingPhase = .responding
@@ -318,7 +439,6 @@ final class AgentManager: ObservableObject {
     /// Only triggers on explicit patterns like `@existingAgent:` or `[delegate to agent]`.
     /// Does NOT auto-create tabs — only routes to existing ones.
     func checkForDelegation(_ response: String) {
-        // Only match explicit bracket patterns — @ mentions must match existing tabs
         let lower = response.lowercased()
 
         // Pattern 1: [delegate to name] / [route to name] / [send to name]
@@ -334,6 +454,7 @@ final class AgentManager: ObservableObject {
                         tabs[idx].messages.append(msg)
                     }
                     activeTabId = existing.id
+                    workflowPhases[existing.id] = .implementing
                     autoSave()
                     return
                 }
@@ -350,19 +471,84 @@ final class AgentManager: ObservableObject {
                     tabs[idx].messages.append(msg)
                 }
                 activeTabId = tab.id
+                workflowPhases[tab.id] = tab.name == "developer" ? .implementing :
+                                        tab.name == "reviewer" ? .reviewing : .idle
                 autoSave()
                 return
             }
         }
     }
 
+    // MARK: - Report Back Protocol
+
+    /// Detect `[Report to supervisor]` or `[Report back]` in the response
+    /// and route the message back to the original delegator (or supervisor as default).
+    func checkForReportBack(_ response: String, from tabId: UUID) {
+        let lower = response.lowercased()
+        let reportPatterns = ["[report to ", "[report back"]
+
+        // Determine target: `[report to reviewer]` or just `[report back]` → supervisor
+        var targetName = "supervisor"
+        for pattern in ["[report to ", "[report back to " ] {
+            if let range = lower.range(of: pattern) {
+                let rest = lower[range.upperBound...].trimmingCharacters(in: .whitespaces)
+                let name = rest.split(whereSeparator: { $0 == " " || $0 == "." || $0 == "]" }).first.map(String.init) ?? ""
+                if !name.isEmpty {
+                    targetName = name
+                }
+                break
+            }
+        }
+
+        // Only proceed if `[report` pattern is actually present
+        let isReport = reportPatterns.contains { lower.contains($0) }
+        guard isReport else { return }
+
+        guard let sourceTab = tabs.first(where: { $0.id == tabId }),
+              let targetTab = tabs.first(where: { $0.name.lowercased() == targetName }),
+              targetTab.id != tabId else { return }
+
+        // Wrap the response as a report message to the target
+        let reportHeader = "[Report from \(sourceTab.name)] "
+        let msg = StoredMessage(
+            role: "user",
+            text: reportHeader + response,
+            sourceTabId: tabId,
+            forwardedFromName: sourceTab.name
+        )
+        if let idx = tabs.firstIndex(where: { $0.id == targetTab.id }) {
+            tabs[idx].messages.append(msg)
+        }
+        activeTabId = targetTab.id
+
+        // Auto-advance workflow phase
+        switch sourceTab.name {
+        case "developer":
+            workflowPhases[targetTab.id] = .reviewing
+        case "reviewer":
+            workflowPhases[targetTab.id] = .verifying
+        case "documenter":
+            workflowPhases[targetTab.id] = .complete
+        default:
+            workflowPhases[targetTab.id] = .idle
+        }
+
+        autoSave()
+    }
+
     // MARK: - Tool Call Tracking
 
-    /// Parse streaming text for tool call patterns and update activeToolCalls
+    /// Parse streaming text for tool call patterns and update activeToolCalls.
+    /// Preserves startedAt timestamps from previous iterations.
     func updateToolCalls(from text: String) {
         var seenNames = Set<String>()
         var updated: [ToolCallInfo] = []
         let lines = text.components(separatedBy: .newlines)
+
+        // Build a lookup of existing calls by name for timestamp preservation
+        let existingByName = activeToolCalls.reduce(into: [String: ToolCallInfo]()) { result, call in
+            result[call.name] = call
+        }
 
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -371,28 +557,32 @@ final class AgentManager: ObservableObject {
             for (emoji, name, icon) in toolCallPatterns {
                 guard trimmed.hasPrefix(emoji) || trimmed.lowercased().contains(name.lowercased()) else { continue }
 
+                let isCompleted = trimmed.contains("✅") || trimmed.contains("✓") || trimmed.contains("succeeded") || trimmed.contains("done")
+                let isFailed = trimmed.contains("❌") || trimmed.contains("failed") || trimmed.contains("error")
+
                 let status: ToolCallStatus2
-                if trimmed.contains("✅") || trimmed.contains("✓") || trimmed.contains("succeeded") || trimmed.contains("done") {
-                    status = .success
-                } else if trimmed.contains("❌") || trimmed.contains("failed") || trimmed.contains("error") {
-                    status = .failed
-                } else {
-                    status = .running
-                }
+                if isFailed { status = .failed }
+                else if isCompleted { status = .success }
+                else { status = .running }
+
+                // Preserve startedAt from previous iteration; set completedAt on completion
+                let startedAt = existingByName[name]?.startedAt ?? Date()
+                let completedAt = existingByName[name]?.completedAt ?? (status != .running ? Date() : nil)
 
                 seenNames.insert(name)
                 updated.append(ToolCallInfo(
                     name: name,
                     icon: icon,
                     status: status,
-                    detail: String(trimmed.prefix(60))
+                    detail: trimmed,
+                    startedAt: startedAt,
+                    completedAt: completedAt
                 ))
                 break
             }
         }
 
-        // Preserve completed tool calls that are already in the list
-        // but no longer in the latest text (they finished in previous deltas)
+        // Preserve completed/failed calls that are already in the list but no longer in latest text
         for existing in activeToolCalls {
             if existing.status == .success || existing.status == .failed {
                 if !seenNames.contains(existing.name) {
@@ -400,6 +590,25 @@ final class AgentManager: ObservableObject {
                 }
             }
         }
+
+        // Detect newly completed calls and append to history
+        let oldStatuses = activeToolCalls.reduce(into: [String: ToolCallStatus2]()) { result, call in
+            result[call.name] = call.status
+        }
+        for call in updated {
+            let oldStatus = oldStatuses[call.name]
+            if oldStatus == .running && (call.status == .success || call.status == .failed) {
+                toolCallHistory.append(call)
+                if toolCallHistory.count > 50 {
+                    toolCallHistory.removeFirst()
+                }
+            }
+        }
+
+        // Update summary counts for status bar
+        totalToolCallsThisSession = updated.count
+        successfulToolCalls = updated.filter { $0.status == .success }.count
+        failedToolCalls = updated.filter { $0.status == .failed }.count
 
         withAnimation(.easeInOut(duration: 0.2)) {
             activeToolCalls = updated
@@ -489,5 +698,23 @@ final class AgentManager: ObservableObject {
 
     func cancelCreateAgent() {
         pendingAgentName = nil
+    }
+
+    // MARK: - Gateway Health
+
+    /// Start polling the Gateway every 30s for connectivity status.
+    private func startHealthPolling() {
+        // Immediate first check
+        Task { await checkGatewayHealth() }
+
+        healthPollTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            Task { [weak self] in await self?.checkGatewayHealth() }
+        }
+    }
+
+    /// Check if the Hermes Gateway is reachable and update isGatewayOnline.
+    @MainActor
+    func checkGatewayHealth() async {
+        isGatewayOnline = await client.checkHealth()
     }
 }

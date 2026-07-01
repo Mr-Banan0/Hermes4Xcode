@@ -55,6 +55,12 @@ final class XcodeContextProvider {
     private var buildProcess: Process?
     var buildDelegate: XcodeBuildDelegate?
 
+    /// Callback fired when a build completes, forwarding exit code + captured output.
+    var onBuildComplete: ((Int32, String) -> Void)?
+
+    private var buildOutputBuffer = ""
+    private var buildStartTime: Date?
+
     private init() {}
 
     // ── Selection ──
@@ -401,18 +407,24 @@ final class XcodeContextProvider {
         p.standardError = outPipe
 
         buildProcess = p
+        buildOutputBuffer = ""
+        buildStartTime = Date()
 
         outPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             guard !data.isEmpty, let line = String(data: data, encoding: .utf8) else { return }
             DispatchQueue.main.async {
+                self?.buildOutputBuffer += line
                 self?.buildDelegate?.buildOutputReceived(line)
             }
         }
 
         p.terminationHandler = { [weak self] process in
             DispatchQueue.main.async {
+                let elapsed = self?.buildStartTime.map { Date().timeIntervalSince($0) } ?? 0
+                let output = self?.buildOutputBuffer ?? ""
                 self?.buildDelegate?.buildFinished(exitCode: process.terminationStatus)
+                self?.onBuildComplete?(process.terminationStatus, output)
                 self?.buildProcess = nil
             }
         }
