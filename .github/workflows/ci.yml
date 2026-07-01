@@ -41,8 +41,7 @@ jobs:
             -scheme Hermes4Xcode \
             -configuration Debug \
             -derivedDataPath DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Test
         run: |
@@ -53,7 +52,8 @@ jobs:
             -derivedDataPath DerivedData \
             -destination "platform=macOS" \
             CODE_SIGNING_ALLOWED=NO \
-            ENABLE_TESTABILITY=YES
+            ENABLE_TESTABILITY=YES \
+            ONLY_ACTIVE_ARCH=YES
 
       - name: Upload Test Results
         if: always()
