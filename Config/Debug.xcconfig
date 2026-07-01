@@ -4,5 +4,5 @@
 
 #include "Shared.xcconfig"
 
-// No additional debug-specific overrides needed
-// All debug settings use Xcode project defaults
+// Ensure Debug uses no optimization (previews + fast builds)
+SWIFT_OPTIMIZATION_LEVEL = -Onone
