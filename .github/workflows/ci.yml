@@ -28,6 +28,9 @@ jobs:
       - name: Install SwiftLint
         run: brew install swiftlint
 
+      - name: Install xcpretty
+        run: gem install xcpretty
+
       - name: SwiftLint
         run: swiftlint --strict
 
@@ -48,10 +51,9 @@ jobs:
             -scheme Hermes4Xcode \
             -configuration Debug \
             -derivedDataPath DerivedData \
-            -destination "platform=macOS,arch=arm64" \
+            -destination "platform=macOS" \
             CODE_SIGNING_ALLOWED=NO \
-            ENABLE_TESTABILITY=YES \
-            | xcpretty && exit ${PIPESTATUS[0]}
+            ENABLE_TESTABILITY=YES
 
       - name: Upload Test Results
         if: always()
