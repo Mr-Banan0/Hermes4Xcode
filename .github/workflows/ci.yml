@@ -48,7 +48,7 @@ jobs:
             -scheme Hermes4Xcode \
             -configuration Debug \
             -derivedDataPath DerivedData \
-            -destination "platform=macOS" \
+            -destination "platform=macOS,arch=arm64" \
             CODE_SIGNING_ALLOWED=NO \
             ENABLE_TESTABILITY=YES \
             | xcpretty && exit ${PIPESTATUS[0]}

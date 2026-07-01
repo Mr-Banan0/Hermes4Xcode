@@ -18,7 +18,12 @@ final class AgentManagerTests: XCTestCase {
     // MARK: - Initial State
 
     func test_init_createsFullTeam() {
-        XCTAssertEqual(manager.tabs.count, 7)
+        // 1 supervisor + 3 team members = 4 tabs
+        XCTAssertEqual(manager.tabs.count, 4)
+        XCTAssertEqual(manager.tabs.filter({ $0.template == .supervisor }).count, 1)
+        XCTAssertEqual(manager.tabs.filter({ $0.template == .reviewer }).count, 1)
+        XCTAssertEqual(manager.tabs.filter({ $0.template == .developer }).count, 1)
+        XCTAssertEqual(manager.tabs.filter({ $0.template == .documenter }).count, 1)
     }
 
     func test_init_defaultTab_isSupervisor() {
@@ -38,7 +43,10 @@ final class AgentManagerTests: XCTestCase {
         XCTAssertFalse(first.messages.isEmpty)
         let welcome = first.messages[0]
         XCTAssertEqual(welcome.role, "assistant")
-        XCTAssertTrue(welcome.text.contains("Supervisor"))
+        XCTAssertTrue(welcome.text.contains("Hermes4Xcode"))
+        XCTAssertTrue(welcome.text.contains("Agent Protocol"))
+        XCTAssertTrue(welcome.text.contains("delegate to developer"))
+        XCTAssertTrue(welcome.text.contains("report back"))
     }
 
     func test_init_activeTabId_matchesFirstTab() {
