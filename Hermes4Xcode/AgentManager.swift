@@ -32,10 +32,13 @@ enum WorkflowPhase: String, Codable {
     case idle
     case planning         // Supervisor analyzing request
     case delegated        // Supervisor → Developer
-    case implementing     // Developer working
-    case reviewing        // Developer → Reviewer
-    case documenting      // Reviewer → Documenter
-    case verifying        // Developer re-checking after review
+    case implementing     // Developer working + building
+    case reviewing        // Developer → Reviewer (code review)
+    case simulating       // Reviewer running functional simulation
+    case awaitingDecision // Reviewer → Supervisor (pass/fail decision)
+    case looping          // Supervisor → Developer (rejected, fix needed)
+    case verifying        // Developer re-checking after fix + rebuild
+    case documenting      // → Documenter
     case complete
 }
 
@@ -454,7 +457,16 @@ final class AgentManager: ObservableObject {
                         tabs[idx].messages.append(msg)
                     }
                     activeTabId = existing.id
-                    workflowPhases[existing.id] = .implementing
+                    // Detect loop-back: Supervisor delegating to Developer after review rejection
+                    if sourceName == "supervisor", name == "developer",
+                       workflowPhases[activeTabId] == .awaitingDecision || name == "developer" {
+                        // Check if this is a re-delegation (Developer already has messages)
+                        let isRedelegation = tabs.first(where: { $0.id == existing.id })?.messages.count ?? 0 > 1
+                        workflowPhases[existing.id] = isRedelegation ? .looping : .implementing
+                    } else {
+                        workflowPhases[existing.id] = name == "developer" ? .implementing :
+                                                      name == "reviewer" ? .reviewing : .idle
+                    }
                     autoSave()
                     return
                 }
@@ -471,8 +483,13 @@ final class AgentManager: ObservableObject {
                     tabs[idx].messages.append(msg)
                 }
                 activeTabId = tab.id
-                workflowPhases[tab.id] = tab.name == "developer" ? .implementing :
-                                        tab.name == "reviewer" ? .reviewing : .idle
+                if sourceName == "supervisor", tab.name == "developer" {
+                    let isRedelegation = tabs.first(where: { $0.id == tab.id })?.messages.count ?? 0 > 1
+                    workflowPhases[tab.id] = isRedelegation ? .looping : .implementing
+                } else {
+                    workflowPhases[tab.id] = tab.name == "developer" ? .implementing :
+                                            tab.name == "reviewer" ? .reviewing : .idle
+                }
                 autoSave()
                 return
             }
@@ -524,9 +541,12 @@ final class AgentManager: ObservableObject {
         // Auto-advance workflow phase
         switch sourceTab.name {
         case "developer":
+            // Developer reports back → reviewer phase
             workflowPhases[targetTab.id] = .reviewing
         case "reviewer":
-            workflowPhases[targetTab.id] = .verifying
+            // Reviewer reports back → supervisor decision
+            workflowPhases[sourceTab.id] = .simulating   // simulation done
+            workflowPhases[targetTab.id] = .awaitingDecision
         case "documenter":
             workflowPhases[targetTab.id] = .complete
         default:
