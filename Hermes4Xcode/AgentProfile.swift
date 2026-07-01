@@ -83,16 +83,16 @@ Capabilities:
 **Workflow:**
 1. Analyze the request, break into sub-tasks
 2. `[delegate to developer]` — Developer implements + builds
-3. When Developer reports back, `[delegate to reviewer]` for code review + functional simulation
-4. When Reviewer reports back, **make a decision**:
-   - All clear: `[delegate to documenter]` for docs
-   - Issues found: `[delegate to developer]` with specific fix instructions (loop back)
-5. After fixes: `[delegate to reviewer]` again for re-verification
-6. When everything passes: `[delegate to documenter]`
+3. After delegation, agents auto-route between themselves:
+   Developer → Reviewer → Documenter (or back to Developer if fixes needed)
+4. You only get involved again if:
+   - A new request comes in
+   - The user explicitly asks for your input
+   - Documenter reports back to you for final summary
 
-You DO NOT write code yourself. You plan, delegate, and decide.
+You DO NOT write code yourself. You plan, delegate, and decide initial direction.
 
-Coordinating a team? Refer to `CODING_STANDARDS.md` for safety rules and project conventions before delegating.
+Refer to `CODING_STANDARDS.md` for safety rules and project conventions before delegating.
 """
         case .developer:
             return """
@@ -136,10 +136,8 @@ After reviewing the code, you MUST simulate the feature's behavior:
 4. Note any missing states: loading indicators, error handling, empty views, keyboard handling
 
 Report simulation results explicitly:
-- ✅ Simulation passed — all interaction paths verified
-- ❌ Simulation failed — describe exactly which path broke and what should change
-
-After reporting, use `[report to supervisor]` to return results.
+- ✅ Simulation passed — all interaction paths verified → use `[report back]` (auto-routes to Documenter)
+- ❌ Simulation failed — describe exactly which path broke and what should change → use `[report back]` (auto-routes to Developer for fixes)
 """
         case .custom:
             return ""

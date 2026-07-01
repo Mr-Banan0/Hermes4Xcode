@@ -498,31 +498,54 @@ final class AgentManager: ObservableObject {
 
     // MARK: - Report Back Protocol
 
-    /// Detect `[Report to supervisor]` or `[Report back]` in the response
-    /// and route the message back to the original delegator (or supervisor as default).
+    /// Detect `[Report to X]` or `[Report back]` in the response
+    /// and route to the next appropriate agent.
+    ///
+    /// Routing rules (simplified, no unnecessary Supervisor hops):
+    /// - Developer (explicit) → target named in `[report to X]`
+    /// - Developer (bare `[report back]`) → reviewer
+    /// - Reviewer (✅ passed) → documenter
+    /// - Reviewer (❌ failed) → developer
+    /// - Documenter → supervisor (final summary)
     func checkForReportBack(_ response: String, from tabId: UUID) {
         let lower = response.lowercased()
         let reportPatterns = ["[report to ", "[report back"]
 
-        // Determine target: `[report to reviewer]` or just `[report back]` → supervisor
-        var targetName = "supervisor"
-        for pattern in ["[report to ", "[report back to " ] {
+        let hasExplicitTarget = reportPatterns.contains { lower.contains($0) }
+        guard hasExplicitTarget else { return }
+
+        guard let sourceTab = tabs.first(where: { $0.id == tabId }) else { return }
+
+        // Resolve target name
+        var targetName = ""
+        for pattern in ["[report to ", "[report back to "] {
             if let range = lower.range(of: pattern) {
                 let rest = lower[range.upperBound...].trimmingCharacters(in: .whitespaces)
                 let name = rest.split(whereSeparator: { $0 == " " || $0 == "." || $0 == "]" }).first.map(String.init) ?? ""
-                if !name.isEmpty {
-                    targetName = name
-                }
-                break
+                if !name.isEmpty { targetName = name; break }
             }
         }
 
-        // Only proceed if `[report` pattern is actually present
-        let isReport = reportPatterns.contains { lower.contains($0) }
-        guard isReport else { return }
+        // Auto-route based on source + result when no explicit target given
+        if targetName.isEmpty {
+            switch sourceTab.name {
+            case "developer":
+                targetName = "reviewer"
+            case "reviewer":
+                // Check if simulation passed or failed
+                if lower.contains("✅") || lower.contains("simulation passed") || lower.contains("all clear") {
+                    targetName = "documenter"
+                } else {
+                    targetName = "developer"
+                }
+            case "documenter":
+                targetName = "supervisor"
+            default:
+                targetName = "supervisor"
+            }
+        }
 
-        guard let sourceTab = tabs.first(where: { $0.id == tabId }),
-              let targetTab = tabs.first(where: { $0.name.lowercased() == targetName }),
+        guard let targetTab = tabs.first(where: { $0.name.lowercased() == targetName }),
               targetTab.id != tabId else { return }
 
         // Wrap the response as a report message to the target
@@ -541,12 +564,13 @@ final class AgentManager: ObservableObject {
         // Auto-advance workflow phase
         switch sourceTab.name {
         case "developer":
-            // Developer reports back → reviewer phase
             workflowPhases[targetTab.id] = .reviewing
         case "reviewer":
-            // Reviewer reports back → supervisor decision
-            workflowPhases[sourceTab.id] = .simulating   // simulation done
-            workflowPhases[targetTab.id] = .awaitingDecision
+            if targetName == "documenter" {
+                workflowPhases[sourceTab.id] = .simulating   // simulation done
+            } else {
+                workflowPhases[targetTab.id] = .looping      // fix needed
+            }
         case "documenter":
             workflowPhases[targetTab.id] = .complete
         default:
