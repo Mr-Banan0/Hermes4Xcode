@@ -19,14 +19,14 @@ final class AgentTabTests: XCTestCase {
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
             name: "CustomTab",
             roleDescription: "Custom role",
-            template: .techLead,
+            template: .reviewer,
             systemPrompt: "Custom system prompt",
             permissions: .all
         )
         XCTAssertEqual(tab.id.uuidString, "00000000-0000-0000-0000-000000000001")
         XCTAssertEqual(tab.name, "CustomTab")
         XCTAssertEqual(tab.roleDescription, "Custom role")
-        XCTAssertEqual(tab.template, .techLead)
+        XCTAssertEqual(tab.template, .reviewer)
         XCTAssertEqual(tab.systemPrompt, "Custom system prompt")
         XCTAssertEqual(tab.permissions, .all)
     }
@@ -35,17 +35,17 @@ final class AgentTabTests: XCTestCase {
         var tab = AgentTab(name: "OldName")
         let profile = AgentProfile(
             name: "NewName",
-            template: .qaEngineer,
+            template: .reviewer,
             role: "New role",
             systemPrompt: "New prompt",
-            permissions: .testOnly
+            permissions: .docOnly
         )
         tab.applyProfile(profile)
         XCTAssertEqual(tab.name, "NewName")
-        XCTAssertEqual(tab.template, .qaEngineer)
+        XCTAssertEqual(tab.template, .reviewer)
         XCTAssertEqual(tab.roleDescription, "New role")
         XCTAssertEqual(tab.systemPrompt, "New prompt")
-        XCTAssertEqual(tab.permissions, .testOnly)
+        XCTAssertEqual(tab.permissions, .docOnly)
     }
 
     func test_tab_profile_snapshotMatches() {
@@ -106,12 +106,12 @@ final class AgentTabTests: XCTestCase {
         XCTAssertTrue(summary.contains("note"))
     }
 
-    func test_tab_permissionSummary_readOnly() {
-        let tab = AgentTab(name: "Test", permissions: .readOnly)
+    func test_tab_permissionSummary_docOnly() {
+        let tab = AgentTab(name: "Test", permissions: .docOnly)
         let summary = tab.permissionSummary
         XCTAssertTrue(summary.contains("read"))
-        XCTAssertTrue(summary.contains("analyze"))
         XCTAssertTrue(summary.contains("structure"))
+        XCTAssertTrue(summary.contains("note"))
         XCTAssertFalse(summary.contains("write"))
         XCTAssertFalse(summary.contains("build"))
     }

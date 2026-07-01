@@ -98,6 +98,7 @@ enum MessageParser {
 
     private static func parseToolCall(_ line: String) -> MessageSegment? {
         // Pattern: emoji + action word + detail
+        // Must stay in sync with AgentManager.toolCallPatterns
         let patterns: [(String, String, String)] = [
             ("🛠", "Build", "hammer"),
             ("📖", "Read", "doc.text"),
@@ -108,7 +109,10 @@ enum MessageParser {
             ("📂", "Open", "folder"),
             ("🚀", "Run", "play"),
             ("🗑", "Delete", "trash"),
-            ("🔧", "Configure", "wrench")
+            ("🔧", "Configure", "wrench"),
+            ("📄", "Create", "doc.badge.plus"),
+            ("♻️", "Refactor", "arrow.triangle.2.circlepath"),
+            ("📋", "Plan", "list.clipboard"),
         ]
 
         for (emoji, action, icon) in patterns {

@@ -12,25 +12,40 @@ struct ToolCallInfo: Identifiable, Equatable {
     let id = UUID()
     let name: String
     let icon: String
-    let status: ToolCallStatus2
-    let detail: String
+    var status: ToolCallStatus2
+    var detail: String
+    let startedAt: Date
+    var completedAt: Date?
+
+    /// Duration in seconds if completed, or elapsed time if still running
+    var duration: TimeInterval? {
+        if let completed = completedAt {
+            return completed.timeIntervalSince(startedAt)
+        }
+        return Date().timeIntervalSince(startedAt)
+    }
+
+    static func == (lhs: ToolCallInfo, rhs: ToolCallInfo) -> Bool {
+        lhs.id == rhs.id && lhs.status == rhs.status
+    }
 }
 
 // MARK: - Live Tool Call Bar
 
 /// Real-time tool call visualization bar shown during agent streaming.
-///
-/// Shows:
-/// - Running tool calls with gold pulsing animation
-/// - Completed tool calls with green checkmark (fade out)
-/// - Failed tool calls with red indicator
-/// - Expandable timeline of all tool calls in this session
-///
 struct LiveToolCallBar: View {
     let toolCalls: [ToolCallInfo]
     let isStreaming: Bool
 
     @State private var showTimeline = false
+    @State private var now = Date()
+
+    /// Timer to refresh elapsed time display every second
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    var runningCount: Int { toolCalls.filter { $0.status == .running }.count }
+    var successCount: Int { toolCalls.filter { $0.status == .success }.count }
+    var failedCount: Int { toolCalls.filter { $0.status == .failed }.count }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,6 +54,12 @@ struct LiveToolCallBar: View {
 
                 // Compact bar
                 HStack(spacing: 6) {
+                    // Session badge
+                    Text("\(runningCount > 0 ? "▶\(runningCount) " : "")✅\(successCount)❌\(failedCount)")
+                        .font(.system(size: 8, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 4)
+
                     ForEach(Array(toolCalls.prefix(4))) { call in
                         ToolCallPill(call: call)
                     }
@@ -54,7 +75,6 @@ struct LiveToolCallBar: View {
                     if isStreaming {
                         HStack(spacing: 2) {
                             Circle().fill(Color.hermes).frame(width: 4, height: 4)
-                                .opacity(isStreaming ? 1 : 0)
                             Text("Working")
                                 .font(.system(size: 8, design: .monospaced))
                                 .foregroundColor(.hermes)
@@ -88,8 +108,15 @@ struct LiveToolCallBar: View {
                                 Text(call.detail)
                                     .font(.system(size: 8, design: .monospaced))
                                     .foregroundColor(.secondary)
-                                    .lineLimit(1)
+                                    .lineLimit(2)
+                                    .frame(maxWidth: 160, alignment: .leading)
                                 Spacer()
+                                // Duration badge
+                                if let d = call.duration, call.status != .running {
+                                    Text(String(format: "%.1fs", d))
+                                        .font(.system(size: 7, design: .monospaced))
+                                        .foregroundColor(.green)
+                                }
                                 statusBadge(call.status)
                             }
                             .padding(.horizontal, 12).padding(.vertical, 3)
@@ -102,6 +129,11 @@ struct LiveToolCallBar: View {
             }
         }
         .transition(.move(edge: .top).combined(with: .opacity))
+        .onReceive(timer) { _ in
+            // Tick to refresh elapsed time display
+            now = Date()
+            _ = now  // silence warning — triggers view refresh via @State
+        }
     }
 
     private func statusColor(_ s: ToolCallStatus2) -> Color {
@@ -143,6 +175,11 @@ struct ToolCallPill: View {
                 .font(.system(size: 8))
             Text(call.name)
                 .font(.system(size: 8, design: .monospaced))
+            if let d = call.duration, call.status == .running {
+                Text(String(format: "%.0fs", d))
+                    .font(.system(size: 7, design: .monospaced))
+                    .foregroundColor(.hermes.opacity(0.7))
+            }
         }
         .padding(.horizontal, 5).padding(.vertical, 2)
         .background(backgroundColor)

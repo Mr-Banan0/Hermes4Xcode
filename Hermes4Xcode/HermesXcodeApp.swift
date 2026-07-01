@@ -52,7 +52,7 @@ struct Hermes4XcodeApp: App {
                     case .cron:
                         CronSettingsView()
                     case .provider:
-                        ProviderSettingsView()
+                        ProviderSettingsView(manager: agentManager)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

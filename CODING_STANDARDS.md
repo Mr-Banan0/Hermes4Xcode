@@ -14,7 +14,7 @@
 - **Protocols**: Describe capability: `Codable`, `Equatable`, `XcodeBuildDelegate`
 - **Enum cases**: `camelCase` — `case supervisor`, `case chatMode`
 - **Booleans**: Use descriptive names — `isStreaming`, `hasNamedConversation`, `canReceiveDelegation`
-- **Avoid abbreviations**: Use `count` not `cnt`, `index` not `idx` (except in very short closures)
+- **Avoid needless abbreviations**: Use `count` not `cnt` (except `idx` for index variables is acceptable — follows standard Swift patterns like `firstIndex(where:)`)
 
 ### File Structure
 
