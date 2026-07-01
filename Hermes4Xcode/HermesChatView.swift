@@ -98,8 +98,14 @@ struct HermesChatView: View {
                         if manager.streamingTabs.contains(activeTab.id) {
                             let streamText = manager.streamingTexts[activeTab.id] ?? ""
                             if streamText.isEmpty {
-                                // Backend is processing — show Thinking indicator
-                                ThinkingIndicator().id("cursor")
+                                let reasoningText = manager.streamingReasoningTexts[activeTab.id] ?? ""
+                                if reasoningText.isEmpty {
+                                    // Backend is processing — show Thinking indicator
+                                    ThinkingIndicator().id("cursor")
+                                } else {
+                                    // Show reasoning content until main text arrives
+                                    ReasoningView(text: reasoningText).id("cursor")
+                                }
                             } else {
                                 let streamMsg = StructuredMessage(
                                     role: "assistant",
@@ -163,6 +169,9 @@ struct HermesChatView: View {
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
+
+        // Status Bar — always visible at the very bottom
+        AgentStatusBar(manager: manager)
         }
         .background(Color.black)
         .frame(minWidth: 420, minHeight: 540)
@@ -202,9 +211,14 @@ struct HermesChatView: View {
         DispatchQueue.global().async {
             let ctx = XcodeContextProvider.shared.fetchSelection()
             let name = XcodeContextProvider.shared.readCurrentFileName()
+            let filePath = XcodeContextProvider.shared.readCurrentFilePath()
             DispatchQueue.main.async {
                 withAnimation(.easeInOut(duration: 0.2)) { selectionCtx = ctx }
                 currentFileName = name
+            }
+            // Auto-open the current file in LSP for diagnostics
+            if let path = filePath, !path.isEmpty {
+                SourceKitLSPClient.shared.openDocument(file: path)
             }
         }
     }
@@ -314,7 +328,7 @@ struct HermesChatView: View {
             let fn = (fp as NSString).lastPathComponent
             manager.appendMessage(StoredMessage(role: "assistant", text: "Analyzing \(fn) with SourceKit-LSP..."), to: activeTab.id)
             Task {
-                let r = await SourceKitLSPClient.shared.getDiagnostics(file: fp) ?? "Analysis complete"
+                let r = await SourceKitLSPClient.shared.getDocumentSymbols(file: fp) ?? "Analysis complete"
                 await MainActor.run { manager.appendMessage(StoredMessage(role: "assistant", text: r), to: activeTab.id) }
             }
             return
@@ -444,8 +458,6 @@ struct SegmentView: View {
         switch segment {
         case .text(let t):
             md(t)
-                .font(.system(size: 13, design: .monospaced))
-                .foregroundColor(Color(white: 0.85))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         case .toolCall(let icon, let name, let status, let detail):
@@ -773,6 +785,41 @@ struct GatewayStatusDot: View {
                 checking = false; isReachable = (resp as? HTTPURLResponse)?.statusCode == 200 && err == nil
             }
         }.resume()
+    }
+}
+
+// MARK: - Reasoning View
+
+/// Displays the model's internal reasoning/thinking process in a gray box
+/// before the final response text arrives.
+struct ReasoningView: View {
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: "brain.head.profile")
+                    .font(.system(size: 8))
+                    .foregroundColor(.secondary)
+                Text("Reasoning")
+                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+
+            Text(text + "\u{258C}")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(Color(white: 0.55))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.leading, 14).padding(.vertical, 6)
+        .background(Color(white: 0.06))
+        .overlay(
+            Rectangle()
+                .frame(width: 2)
+                .foregroundColor(Color.secondary.opacity(0.3)),
+            alignment: .leading
+        )
     }
 }
 
