@@ -97,7 +97,7 @@ final class AgentManager: ObservableObject {
         ("🔧", "Configure", "wrench.fill"),
         ("📄", "Create", "doc.badge.plus"),
         ("♻️", "Refactor", "arrow.triangle.2.circlepath"),
-        ("📋", "Plan", "list.clipboard"),
+        ("📋", "Plan", "list.clipboard")
     ]
 
     private let client = HermesAPIClient()
@@ -158,7 +158,7 @@ final class AgentManager: ObservableObject {
         let team: [(String, AgentTemplate)] = [
             ("reviewer", .reviewer),
             ("developer", .developer),
-            ("documenter", .documenter),
+            ("documenter", .documenter)
         ]
         for (name, template) in team {
             let profile = AgentProfile(name: name, template: template)

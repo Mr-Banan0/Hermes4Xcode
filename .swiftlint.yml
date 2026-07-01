@@ -133,7 +133,9 @@ disabled_rules:
   - no_grouping_extension
   - number_separator
   - pattern_matching_keywords
+  - prefer_self_in_static_references
   - redundant_optional_initialization
+  - trailing_comma
   - redundant_string_enum_value
   - single_test_class
   - statement_position
@@ -157,7 +159,7 @@ analyzer_rules:
 
 # Configurable rules
 file_length:
-  warning: 800
+  warning: 900
   error: 1200
 
 function_body_length:

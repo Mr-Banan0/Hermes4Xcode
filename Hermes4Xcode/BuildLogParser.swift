@@ -159,9 +159,9 @@ enum BuildLogParser {
 
     private static func parseStatusEntry(_ line: String) -> BuildLogEntry? {
         guard let statusPattern else { return nil }
-        guard let _ = statusPattern.firstMatch(
+        guard statusPattern.firstMatch(
             in: line, range: NSRange(line.startIndex..., in: line)
-        ) else { return nil }
+        ) != nil else { return nil }
 
         if line.contains("SUCCEEDED") {
             return BuildLogEntry(type: .success, file: nil, line: nil, column: nil, message: line)
@@ -171,9 +171,9 @@ enum BuildLogParser {
 
     private static func parseTestEntry(_ line: String) -> BuildLogEntry? {
         guard let testPattern else { return nil }
-        guard let _ = testPattern.firstMatch(
+        guard testPattern.firstMatch(
             in: line, range: NSRange(line.startIndex..., in: line)
-        ) else { return nil }
+        ) != nil else { return nil }
 
         // Detect test success vs failure
         let isSuccess = line.contains("passed") || line.contains("succeeded")

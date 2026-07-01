@@ -843,7 +843,7 @@ struct ThinkingIndicator: View {
         }
         .padding(.leading, 14).padding(.vertical, 8)
         .onAppear {
-            Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+            Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
                 phase = (phase + 1) % dots.count
             }
         }
