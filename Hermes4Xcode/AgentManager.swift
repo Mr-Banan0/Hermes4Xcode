@@ -140,7 +140,7 @@ final class AgentManager: ObservableObject {
 
     /// Create the default team of agent tabs (Supervisor + Dev Team).
     static func makeDefaultTabs() -> [AgentTab] {
-        let welcome = StoredMessage(role: "assistant", text: "👋 Welcome to **Hermes4Xcode**! I coordinate the team.\\n\\n**Your Team:**\\n👓 Reviewer — review, design, QA, specs & architecture\\n🔨 Developer — implementation\\n📄 Documenter — docs & notes\\n\\n**Agent Protocol:**\\n- `[delegate to developer]` or `@developer:` — route a task\\n- `[report back]` or `[report to supervisor]` — return results\\n- `[report to reviewer]` — send for review\\n\\nWhat are we building today?")
+        let welcome = StoredMessage(role: "assistant", text: "👋 Welcome to **Hermes4Xcode**! I coordinate the team.\n\n**Your Team:**\n👓 Reviewer — review, design, QA, specs & architecture\n🔨 Developer — implementation\n📄 Documenter — docs & notes\n\n**Agent Protocol:**\n- `[delegate to developer]` or `@developer:` — route a task\n- `[report back]` or `[report to supervisor]` — return results\n- `[report to reviewer]` — send for review\n\nWhat are we building today?")
 
         // Supervisor (default active tab)
         var supervisor = AgentTab(id: UUID(), name: "supervisor", template: .supervisor)
