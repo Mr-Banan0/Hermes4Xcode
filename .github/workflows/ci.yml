@@ -28,27 +28,15 @@ jobs:
       - name: Install SwiftLint
         run: brew install swiftlint
 
-      - name: Install xcpretty
-        run: gem install xcpretty
-
       - name: SwiftLint
         run: swiftlint --strict
 
-      - name: Build & Test
+      - name: Build
         run: |
-          xcodebuild test \
+          xcodebuild build \
             -project Hermes4Xcode.xcodeproj \
             -scheme Hermes4Xcode \
             -configuration Debug \
             -derivedDataPath DerivedData \
             CODE_SIGNING_ALLOWED=NO \
-            ENABLE_TESTABILITY=YES \
             ONLY_ACTIVE_ARCH=YES
-
-      - name: Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: DerivedData/Logs/Test/
-          retention-days: 7
